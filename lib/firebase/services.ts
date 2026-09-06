@@ -209,9 +209,15 @@ export async function deleteFirm(id: string): Promise<void> {
 // ==========================================
 export async function getChallenges(): Promise<Challenge[]> {
   if (!db) return [];
-  const colRef = collection(db, 'challenges');
-  const snap = await getDocs(query(colRef, orderBy('price')));
-  return mapSnapshot<Challenge>(snap);
+  try {
+    const colRef = collection(db, 'challenges');
+    const snap = await getDocs(colRef);
+    const list = mapSnapshot<Challenge>(snap);
+    return list.sort((a, b) => (a.price || 0) - (b.price || 0));
+  } catch (err) {
+    console.error('Failed to fetch challenges from Firestore:', err);
+    return [];
+  }
 }
 
 export async function getChallengesByFirm(firmId: string): Promise<Challenge[]> {

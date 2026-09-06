@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -53,9 +53,9 @@ const PLATFORM_DATA: Record<string, { name: string; logo: string; type: 'forex' 
 type SortMode = 'all' | 'popular' | 'best-value';
 
 export function FirmsClient() {
-  const [firms, setFirms] = useState<Firm[]>(MOCK_FIRMS);
-  const [allReviews, setAllReviews] = useState<Review[]>(MOCK_REVIEWS);
-  const [loading, setLoading] = useState(false);
+  const [firms, setFirms] = useState<Firm[]>([]);
+  const [allReviews, setAllReviews] = useState<Review[]>([]);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [sortMode, setSortMode] = useState<SortMode>('all');
@@ -66,12 +66,30 @@ export function FirmsClient() {
 
   const [hoveredFirmId, setHoveredFirmId] = useState<string | null>(null);
   const [expandedFirmId, setExpandedFirmId] = useState<string | null>(null);
+  const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Discount code copying & validation states
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [hasCopiedCodes, setHasCopiedCodes] = useState<Record<string, boolean>>({});
   const [shakingFirmId, setShakingFirmId] = useState<string | null>(null);
   const [warningFirmId, setWarningFirmId] = useState<string | null>(null);
+
+  const handleMouseEnterFirm = (id: string) => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    setHoveredFirmId(id);
+  };
+
+  const handleMouseLeaveFirm = () => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+    }
+    hoverTimerRef.current = setTimeout(() => {
+      setHoveredFirmId(null);
+    }, 300); // 300ms smooth stay duration after removing mouse pointer
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -84,15 +102,17 @@ export function FirmsClient() {
           const uniqueFirms = Array.from(new Map(firmsData.map(f => [f.id || f.slug, f])).values());
           setFirms(uniqueFirms);
         } else {
-          const uniqueMocks = Array.from(new Map(MOCK_FIRMS.map(f => [f.id, f])).values());
-          setFirms(uniqueMocks);
+          setFirms(MOCK_FIRMS);
         }
         if (reviewsData && reviewsData.length > 0) {
           setAllReviews(reviewsData);
+        } else {
+          setAllReviews(MOCK_REVIEWS);
         }
       } catch (err) {
         console.error('Failed to fetch data from Firestore:', err);
         setFirms(MOCK_FIRMS);
+        setAllReviews(MOCK_REVIEWS);
       } finally {
         setLoading(false);
       }
@@ -530,7 +550,7 @@ export function FirmsClient() {
 
           {/* Rows List with Smooth Framer Motion layout & stagger animation */}
           <TooltipProvider>
-            <motion.div layout className="space-y-3.5">
+            <div className="space-y-3.5">
               <AnimatePresence mode="popLayout">
                 {processedFirms.length > 0 ? (
                   processedFirms.map((firm) => {
@@ -577,15 +597,15 @@ export function FirmsClient() {
 
                     return (
                       <motion.div
-                        layout
+                        layout="position"
                         key={firm.id}
-                        initial={{ opacity: 0, y: 16, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
-                        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                        onMouseEnter={() => setHoveredFirmId(firm.id)}
-                        onMouseLeave={() => setHoveredFirmId(null)}
-                        className={`relative rounded-2xl transition-all duration-300 border ${
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -2, transition: { duration: 0.15 } }}
+                        transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                        onMouseEnter={() => handleMouseEnterFirm(firm.id)}
+                        onMouseLeave={handleMouseLeaveFirm}
+                        className={`relative rounded-2xl transition-all duration-500 ease-in-out border ${
                           isExpanded || isHovered
                             ? 'border-black dark:border-white shadow-[0_0_20px_rgba(0,0,0,0.14)] dark:shadow-[0_0_25px_rgba(255,255,255,0.18)] bg-white/70 dark:bg-card backdrop-blur-md'
                             : 'border-zinc-200 dark:border-border hover:border-black dark:hover:border-white hover:shadow-[0_0_18px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_0_22px_rgba(255,255,255,0.16)] bg-white/60 dark:bg-card backdrop-blur-md'
@@ -852,7 +872,7 @@ export function FirmsClient() {
                               initial={{ opacity: 0, height: 0 }}
                               animate={{ opacity: 1, height: 'auto' }}
                               exit={{ opacity: 0, height: 0 }}
-                              transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                              transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
                               className="overflow-hidden border-t border-zinc-100 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/30 rounded-b-2xl pt-2 pb-1"
                             >
                               <div className="p-4 sm:p-5 space-y-4">
@@ -978,7 +998,7 @@ export function FirmsClient() {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </motion.div>
+            </div>
           </TooltipProvider>
         </div>
       </div>

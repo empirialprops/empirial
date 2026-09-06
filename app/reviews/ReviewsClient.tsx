@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -40,6 +40,7 @@ export function ReviewsClient() {
   const [hoveredFirmId, setHoveredFirmId] = useState<string | null>(null);
   const [expandedFirmId, setExpandedFirmId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Review Modal State
   const [viewAllFirmId, setViewAllFirmId] = useState<string | null>(null);
@@ -54,12 +55,40 @@ export function ReviewsClient() {
   const [usabilityRating, setUsabilityRating] = useState<number>(5);
   const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
 
+  const handleMouseEnterReview = (id: string) => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    setHoveredFirmId(id);
+  };
+
+  const handleMouseLeaveReview = () => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+    }
+    hoverTimerRef.current = setTimeout(() => {
+      setHoveredFirmId(null);
+    }, 300); // 300ms smooth stay duration after removing mouse pointer
+  };
+
   useEffect(() => {
     async function loadReviewsData() {
       try {
         const [revs, fms] = await Promise.all([getReviews(), getFirms()]);
-        setReviewsList(revs);
-        setFirmsList(fms.length > 0 ? fms : MOCK_FIRMS);
+        if (revs && revs.length > 0) {
+          const uniqueRevs = Array.from(new Map(revs.map((r) => [r.id, r])).values());
+          setReviewsList(uniqueRevs);
+        } else {
+          setReviewsList(MOCK_REVIEWS);
+        }
+
+        if (fms && fms.length > 0) {
+          const uniqueFirms = Array.from(new Map(fms.map((f) => [f.id || f.slug, f])).values());
+          setFirmsList(uniqueFirms);
+        } else {
+          setFirmsList(MOCK_FIRMS);
+        }
       } catch (err) {
         console.error('Failed to load reviews dynamic data:', err);
         setReviewsList(MOCK_REVIEWS);
@@ -463,7 +492,7 @@ export function ReviewsClient() {
 
           {/* Rows List with Fluid Animations & Hover Dropdown Accordion */}
           <TooltipProvider>
-            <motion.div layout className="space-y-3.5">
+            <div className="space-y-3.5">
               <AnimatePresence mode="popLayout">
                 {filteredRows.length > 0 ? (
                   filteredRows.map((row) => {
@@ -476,16 +505,16 @@ export function ReviewsClient() {
 
                     return (
                       <motion.div
-                        layout
+                        layout="position"
                         key={firm.id}
-                        initial={{ opacity: 0, y: 14 }}
+                        initial={{ opacity: 0, y: 4 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.98 }}
-                        transition={{ duration: 0.25, ease: 'easeOut' }}
-                        onMouseEnter={() => setHoveredFirmId(firm.id)}
-                        onMouseLeave={() => setHoveredFirmId(null)}
+                        exit={{ opacity: 0, y: -2, transition: { duration: 0.15 } }}
+                        transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                        onMouseEnter={() => handleMouseEnterReview(firm.id)}
+                        onMouseLeave={handleMouseLeaveReview}
                         onClick={() => setExpandedFirmId(expandedFirmId === firm.id ? null : firm.id)}
-                        className={`relative rounded-2xl transition-all duration-200 border ${
+                        className={`relative rounded-2xl transition-all duration-500 ease-in-out border ${
                           isExpanded
                             ? 'border-black dark:border-white shadow-[0_0_20px_rgba(0,0,0,0.12)] dark:shadow-[0_0_25px_rgba(255,255,255,0.16)] bg-white/65 dark:bg-card backdrop-blur-md'
                             : 'border-zinc-200 dark:border-border hover:border-black dark:hover:border-white bg-white/60 dark:bg-card backdrop-blur-md shadow-xs'
@@ -647,12 +676,12 @@ export function ReviewsClient() {
 
                         {/* 6. Hover / Click Dropdown Menu with Hand-Written Reviews */}
                         <AnimatePresence>
-                          {isExpanded && (
+                          {(isHovered || isExpanded) && (
                             <motion.div
                               initial={{ opacity: 0, height: 0 }}
                               animate={{ opacity: 1, height: 'auto' }}
                               exit={{ opacity: 0, height: 0 }}
-                              transition={{ duration: 0.24, ease: 'easeInOut' }}
+                              transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
                               className="overflow-hidden border-t border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/50 backdrop-blur-md rounded-b-2xl"
                             >
                               <div className="p-4 sm:p-6 space-y-4">
@@ -827,7 +856,7 @@ export function ReviewsClient() {
                   </div>
                 )}
               </AnimatePresence>
-            </motion.div>
+            </div>
           </TooltipProvider>
 
         </div>

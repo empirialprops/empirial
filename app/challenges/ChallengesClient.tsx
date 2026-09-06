@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -54,9 +54,9 @@ const FIRM_LOGOS: Record<string, string> = {
 };
 
 export function ChallengesClient() {
-  const [challenges, setChallenges] = useState<Challenge[]>(MOCK_CHALLENGES);
-  const [firms, setFirms] = useState<any[]>(MOCK_FIRMS);
-  const [loading, setLoading] = useState(false);
+  const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [firms, setFirms] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
   const firmParam = searchParams.get('firm');
   const stepParam = searchParams.get('step');
@@ -112,6 +112,7 @@ export function ChallengesClient() {
   // Hover & Expand states
   const [hoveredChallengeId, setHoveredChallengeId] = useState<string | null>(null);
   const [expandedChallengeId, setExpandedChallengeId] = useState<string | null>(null);
+  const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Copy Code & Shaking Vibration & Warning states
   const [hasCopiedCodes, setHasCopiedCodes] = useState<Record<string, boolean>>({});
@@ -120,6 +121,23 @@ export function ChallengesClient() {
   const [warningChallengeId, setWarningChallengeId] = useState<string | null>(null);
 
   const [allReviews, setAllReviews] = useState<Review[]>([]);
+
+  const handleMouseEnterChallenge = (id: string) => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    setHoveredChallengeId(id);
+  };
+
+  const handleMouseLeaveChallenge = () => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+    }
+    hoverTimerRef.current = setTimeout(() => {
+      setHoveredChallengeId(null);
+    }, 300); // 300ms smooth stay duration after removing mouse pointer
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -130,12 +148,28 @@ export function ChallengesClient() {
           getReviews()
         ]);
         if (challsData && challsData.length > 0) {
-          setChallenges(challsData);
+          const map = new Map<string, Challenge>();
+          challsData.forEach((c) => {
+            if (c.id) map.set(c.id, c);
+          });
+          MOCK_CHALLENGES.forEach((c) => {
+            if (c.id && !map.has(c.id)) map.set(c.id, c);
+          });
+          setChallenges(Array.from(map.values()));
         } else {
           setChallenges(MOCK_CHALLENGES);
         }
         if (firmsData && firmsData.length > 0) {
-          setFirms(firmsData);
+          const map = new Map<string, any>();
+          firmsData.forEach((f) => {
+            const key = f.id || f.slug;
+            if (key) map.set(key, f);
+          });
+          MOCK_FIRMS.forEach((f) => {
+            const key = f.id || f.slug;
+            if (key && !map.has(key)) map.set(key, f);
+          });
+          setFirms(Array.from(map.values()));
         } else {
           setFirms(MOCK_FIRMS);
         }
@@ -244,13 +278,14 @@ export function ChallengesClient() {
       }
 
       // Market Category
-      if (selectedCategory !== 'all' && ch.category !== selectedCategory) return false;
+      if (selectedCategory !== 'all' && (ch.category || 'forex').toLowerCase() !== selectedCategory.toLowerCase()) return false;
 
       // Firms Multi-Select
       if (
         selectedFirms.length > 0 &&
         !selectedFirms.includes(ch.firm_id) &&
-        (!ch.firm_slug || !selectedFirms.includes(ch.firm_slug))
+        (!ch.firm_slug || !selectedFirms.includes(ch.firm_slug)) &&
+        (!ch.firm_name || !selectedFirms.some((sf) => sf.toLowerCase() === ch.firm_name.toLowerCase()))
       )
         return false;
 
@@ -277,7 +312,7 @@ export function ChallengesClient() {
     }
 
     return list;
-  }, [query, selectedCategory, selectedFirms, selectedSizes, selectedSteps, sortMode]);
+  }, [challenges, query, selectedCategory, selectedFirms, selectedSizes, selectedSteps, sortMode]);
 
   if (loading) {
     return (
@@ -549,7 +584,7 @@ export function ChallengesClient() {
 
           {/* Rows List with Smooth Framer Motion layout & translucent white theme styling */}
           <TooltipProvider>
-            <motion.div layout className="space-y-3.5">
+            <div className="space-y-3.5">
               <AnimatePresence mode="popLayout">
                 {processedChallenges.length > 0 ? (
                   processedChallenges.map((ch) => {
@@ -594,16 +629,16 @@ export function ChallengesClient() {
 
                     return (
                       <motion.div
-                        layout
+                        layout="position"
                         key={ch.id}
-                        initial={{ opacity: 0, y: 16, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
-                        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                        onMouseEnter={() => setHoveredChallengeId(ch.id)}
-                        onMouseLeave={() => setHoveredChallengeId(null)}
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -2, transition: { duration: 0.15 } }}
+                        transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                        onMouseEnter={() => handleMouseEnterChallenge(ch.id)}
+                        onMouseLeave={handleMouseLeaveChallenge}
                         onClick={() => setExpandedChallengeId(expandedChallengeId === ch.id ? null : ch.id)}
-                        className={`relative rounded-2xl transition-all duration-300 border cursor-pointer ${
+                        className={`relative rounded-2xl transition-all duration-500 ease-in-out border cursor-pointer ${
                           isExpanded
                             ? 'border-black dark:border-white shadow-[0_0_20px_rgba(0,0,0,0.12)] dark:shadow-[0_0_25px_rgba(255,255,255,0.16)] bg-white/65 dark:bg-card backdrop-blur-md'
                             : 'border-zinc-200/80 dark:border-border hover:border-black dark:hover:border-white hover:shadow-[0_0_18px_rgba(0,0,0,0.10)] dark:hover:shadow-[0_0_22px_rgba(255,255,255,0.14)] bg-white/60 dark:bg-card backdrop-blur-md'
@@ -862,12 +897,12 @@ export function ChallengesClient() {
 
                         {/* Smooth Accordion / Dropdown Details Expansion on Hover */}
                         <AnimatePresence>
-                          {isExpanded && (
+                          {(isHovered || isExpanded) && (
                             <motion.div
                               initial={{ opacity: 0, height: 0 }}
                               animate={{ opacity: 1, height: 'auto' }}
                               exit={{ opacity: 0, height: 0 }}
-                              transition={{ duration: 0.25, ease: 'easeInOut' }}
+                              transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
                               className="overflow-hidden border-t border-zinc-200/60 dark:border-zinc-800/80 bg-zinc-50/40 dark:bg-zinc-900/30 backdrop-blur-sm rounded-b-2xl"
                             >
                               <div className="p-4 sm:p-6 space-y-4">
@@ -979,7 +1014,7 @@ export function ChallengesClient() {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </motion.div>
+            </div>
           </TooltipProvider>
         </div>
       </div>
