@@ -148,6 +148,12 @@ export default function NavBar() {
       href: "/events",
       icon: <TimerIcon className="mr-2.5 h-4 w-4 shrink-0 text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors" />,
     },
+    {
+      title: "Contact & Desk",
+      desc: "Email, WhatsApp, Discord & Live Chat",
+      href: "/contact",
+      icon: <Ticket className="mr-2.5 h-4 w-4 shrink-0 text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors" />,
+    },
   ];
 
   const showNavbarBlur = isScrolled || isMenuOpen;

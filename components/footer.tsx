@@ -79,9 +79,12 @@ const Footer = () => {
   ];
 
   const footerLinks = [
-    { name: "Pricing", href: "#pricing" },
-    { name: "Testimonials", href: "#testimonials" },
-    { name: "Get Started", href: "#" },
+    { name: "About Us", href: "/about" },
+    { name: "Contact Us", href: "/contact" },
+    { name: "Careers", href: "/careers" },
+    { name: "Prop Firms", href: "/firms" },
+    { name: "Challenges", href: "/challenges" },
+    { name: "Reviews", href: "/reviews" },
   ];
 
   return (

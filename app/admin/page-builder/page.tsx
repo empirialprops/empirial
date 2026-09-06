@@ -23,6 +23,10 @@ import {
   X,
   Search,
   Filter,
+  Mail,
+  Briefcase,
+  Ticket,
+  Phone,
 } from 'lucide-react';
 import {
   getSiteSettings,
@@ -42,7 +46,7 @@ import {
 import { Firm, Review, Challenge } from '@/lib/types';
 
 export default function AdminPageBuilderPage() {
-  const [activeTab, setActiveTab] = useState<'hero' | 'partners' | 'plans' | 'stats' | 'testimonials'>('hero');
+  const [activeTab, setActiveTab] = useState<'hero' | 'about' | 'contact' | 'careers' | 'partners' | 'plans' | 'stats' | 'testimonials'>('hero');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
@@ -111,6 +115,62 @@ export default function AdminPageBuilderPage() {
   const [reviewFirmFilter, setReviewFirmFilter] = useState('all');
   const [reviewRatingFilter, setReviewRatingFilter] = useState('all');
 
+  // 6. ABOUT US PAGE CMS STATE
+  const [aboutTitle, setAboutTitle] = useState('About EMPIRIAL 2.0');
+  const [aboutSubtitle, setAboutSubtitle] = useState('Pioneering forensic prop firm audits, real-time liquidity benchmarks, and transparent challenge evaluations for traders globally.');
+  const [aboutWhatAreWe, setAboutWhatAreWe] = useState('The proprietary trading firm industry has grown exponentially, but with this expansion came misleading marketing, hidden drawdown thresholds, and unpredictable payout denials. EMPIRIAL (engineered by ANURAJ FX) was founded to bring absolute forensic clarity to the market.');
+  const [aboutMission, setAboutMission] = useState('Our mission is to empower retail traders worldwide with unbiased data, verified discount deals, and mathematical evaluation models. We independently purchase, test, and audit evaluation challenges, calculate true effective spread costs, and verify real trader payment proofs through cryptographic hashes and verified receipts.');
+  const [aboutJoinTeam, setAboutJoinTeam] = useState('We are constantly expanding our global network of prop analysts, quantitative auditors, community moderators, and frontend engineers. If you are passionate about market transparency and prop trading, explore our open positions or reach out directly through our Discord ticket system.');
+  const [aboutStat1Val, setAboutStat1Val] = useState('$15.2M+');
+  const [aboutStat1Label, setAboutStat1Label] = useState('Payouts Audited');
+  const [aboutStat2Val, setAboutStat2Val] = useState('520+');
+  const [aboutStat2Label, setAboutStat2Label] = useState('Programs Evaluated');
+  const [aboutStat3Val, setAboutStat3Val] = useState('48,500+');
+  const [aboutStat3Label, setAboutStat3Label] = useState('Trader Members');
+  const [aboutFaqs, setAboutFaqs] = useState<Array<{ q: string; a: string }>>([
+    {
+      q: 'What is EMPIRIAL 2.0?',
+      a: 'EMPIRIAL 2.0 is an independent proprietary trading intelligence matrix engineered by ANURAJ FX. We independently purchase, test, and audit evaluation challenges, calculate true spread & slippage costs, and verify real trader payment proofs.',
+    },
+    {
+      q: 'How does EMPIRIAL verify prop firm payout proofs?',
+      a: 'Every payout proof displayed on EMPIRIAL undergoes cryptographic hash verification, banking receipt checks, and direct confirmation from audited community traders.',
+    },
+    {
+      q: 'How can I join the EMPIRIAL Analyst & Auditor Team?',
+      a: 'We welcome seasoned traders, quantitative analysts, and community moderators. Check our Careers page or create a ticket on our Discord server to get in touch.',
+    },
+  ]);
+
+  // 7. CONTACT US PAGE CMS STATE
+  const [contactTitle, setContactTitle] = useState('Contact EMPIRIAL Desk');
+  const [contactSubtitle, setContactSubtitle] = useState('Have an inquiry, partnership proposal, or want your prop firm audited? Reach out directly to our team through any of our official channels.');
+  const [contactEmail, setContactEmail] = useState('support@empirial.com');
+  const [contactWhatsapp, setContactWhatsapp] = useState('+1 (555) 890-EMPIRE');
+  const [contactWhatsappLink, setContactWhatsappLink] = useState('https://wa.me/15558903674');
+  const [contactDiscordUrl, setContactDiscordUrl] = useState('https://discord.gg/yqFtbfJhh9');
+
+  // 8. CAREERS PAGE CMS STATE
+  const [careersTitle, setCareersTitle] = useState('Join the EMPIRIAL Team');
+  const [careersSubtitle, setCareersSubtitle] = useState('Help us build the world’s most transparent proprietary trading intelligence platform.');
+  const [careersDiscordUrl, setCareersDiscordUrl] = useState('https://discord.gg/yqFtbfJhh9');
+  const [careersPositions, setCareersPositions] = useState<Array<{ id: string; title: string; type: string; department: string; desc: string }>>([
+    {
+      id: 'pos-1',
+      title: 'Senior Prop Firm Auditor',
+      type: 'Full-Time / Remote',
+      department: 'Forensic Audit Desk',
+      desc: 'Audit drawdown algorithms, hidden breach terms, and spread markups.',
+    },
+    {
+      id: 'pos-2',
+      title: 'Quantitative Data Analyst',
+      type: 'Full-Time / Remote',
+      department: 'Market Data Engineering',
+      desc: 'Maintain real-time liquidity benchmarking feeds.',
+    },
+  ]);
+
   // Load All Homepage Configuration Data
   useEffect(() => {
     async function loadAllConfig() {
@@ -143,6 +203,40 @@ export default function AdminPageBuilderPage() {
           setCta1Url(settings.hero.cta1Url || '/deals');
           setCta2Text(settings.hero.cta2Text || 'Join Discord');
           setCta2Url(settings.hero.cta2Url || 'https://discord.gg/ww4dkeeZdp');
+        }
+
+        // About Page CMS
+        if (settings && settings.aboutPage) {
+          setAboutTitle(settings.aboutPage.title || 'About EMPIRIAL 2.0');
+          setAboutSubtitle(settings.aboutPage.subtitle || '');
+          setAboutWhatAreWe(settings.aboutPage.whatAreWe || '');
+          setAboutMission(settings.aboutPage.mission || '');
+          setAboutJoinTeam(settings.aboutPage.joinTeam || '');
+          setAboutStat1Val(settings.aboutPage.stat1Value || '$15.2M+');
+          setAboutStat1Label(settings.aboutPage.stat1Label || 'Payouts Audited');
+          setAboutStat2Val(settings.aboutPage.stat2Value || '520+');
+          setAboutStat2Label(settings.aboutPage.stat2Label || 'Programs Evaluated');
+          setAboutStat3Val(settings.aboutPage.stat3Value || '48,500+');
+          setAboutStat3Label(settings.aboutPage.stat3Label || 'Trader Members');
+          if (settings.aboutPage.faqs) setAboutFaqs(settings.aboutPage.faqs);
+        }
+
+        // Contact Page CMS
+        if (settings && settings.contactPage) {
+          setContactTitle(settings.contactPage.title || 'Contact EMPIRIAL Desk');
+          setContactSubtitle(settings.contactPage.subtitle || '');
+          setContactEmail(settings.contactPage.email || 'support@empirial.com');
+          setContactWhatsapp(settings.contactPage.whatsapp || '+1 (555) 890-EMPIRE');
+          setContactWhatsappLink(settings.contactPage.whatsappLink || 'https://wa.me/15558903674');
+          setContactDiscordUrl(settings.contactPage.discordUrl || 'https://discord.gg/yqFtbfJhh9');
+        }
+
+        // Careers Page CMS
+        if (settings && settings.careersPage) {
+          setCareersTitle(settings.careersPage.title || 'Join the EMPIRIAL Team');
+          setCareersSubtitle(settings.careersPage.subtitle || '');
+          setCareersDiscordUrl(settings.careersPage.discordUrl || 'https://discord.gg/yqFtbfJhh9');
+          if (settings.careersPage.positions) setCareersPositions(settings.careersPage.positions);
         }
 
         // 2. Partner Logos
@@ -308,6 +402,82 @@ export default function AdminPageBuilderPage() {
     } catch (err) {
       console.error('Failed to save hero:', err);
       alert('Failed to save hero settings.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // SAVE ABOUT PAGE CMS
+  const handleSaveAboutPage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      invalidateSiteSettingsCache();
+      await updateSiteSettings({
+        aboutPage: {
+          title: aboutTitle,
+          subtitle: aboutSubtitle,
+          whatAreWe: aboutWhatAreWe,
+          mission: aboutMission,
+          joinTeam: aboutJoinTeam,
+          stat1Value: aboutStat1Val,
+          stat1Label: aboutStat1Label,
+          stat2Value: aboutStat2Val,
+          stat2Label: aboutStat2Label,
+          stat3Value: aboutStat3Val,
+          stat3Label: aboutStat3Label,
+          faqs: aboutFaqs,
+        },
+      });
+      showNotification('About Us Page CMS settings saved successfully!');
+    } catch (err) {
+      console.error('Failed to save About Page CMS:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // SAVE CONTACT PAGE CMS
+  const handleSaveContactPage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      invalidateSiteSettingsCache();
+      await updateSiteSettings({
+        contactPage: {
+          title: contactTitle,
+          subtitle: contactSubtitle,
+          email: contactEmail,
+          whatsapp: contactWhatsapp,
+          whatsappLink: contactWhatsappLink,
+          discordUrl: contactDiscordUrl,
+        },
+      });
+      showNotification('Contact Us Page CMS settings saved successfully!');
+    } catch (err) {
+      console.error('Failed to save Contact Page CMS:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // SAVE CAREERS PAGE CMS
+  const handleSaveCareersPage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      invalidateSiteSettingsCache();
+      await updateSiteSettings({
+        careersPage: {
+          title: careersTitle,
+          subtitle: careersSubtitle,
+          discordUrl: careersDiscordUrl,
+          positions: careersPositions,
+        },
+      });
+      showNotification('Careers Page CMS settings saved successfully!');
+    } catch (err) {
+      console.error('Failed to save Careers Page CMS:', err);
     } finally {
       setSaving(false);
     }
@@ -588,11 +758,14 @@ export default function AdminPageBuilderPage() {
       {/* Tabs Navigation */}
       <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2 overflow-x-auto">
         {[
-          { id: 'hero', label: '1. Hero Headline & CTAs', icon: Sparkles },
-          { id: 'partners', label: '2. Verified Firms Logos', icon: ImageIcon },
-          { id: 'plans', label: '3. Choose Your Plan (3 Cards)', icon: Trophy },
-          { id: 'stats', label: '4. Dynamic Live Stats', icon: BarChart3 },
-          { id: 'testimonials', label: '5. Loved By Traders Worldwide', icon: Star },
+          { id: 'hero', label: '1. Home Page Hero', icon: Sparkles },
+          { id: 'about', label: '2. About Us Page', icon: ShieldCheck },
+          { id: 'contact', label: '3. Contact Us Page', icon: Mail },
+          { id: 'careers', label: '4. Careers & Discord', icon: Briefcase },
+          { id: 'partners', label: '5. Verified Firms Logos', icon: ImageIcon },
+          { id: 'plans', label: '6. Choose Your Plan', icon: Trophy },
+          { id: 'stats', label: '7. Dynamic Live Stats', icon: BarChart3 },
+          { id: 'testimonials', label: '8. Loved By Traders', icon: Star },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -723,6 +896,448 @@ export default function AdminPageBuilderPage() {
               className="px-6 py-2.5 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-semibold cursor-pointer shadow-xs"
             >
               {saving ? 'Saving...' : 'Save Hero Changes'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SECTION: ABOUT US PAGE CMS */}
+      {/* ========================================================================= */}
+      {activeTab === 'about' && (
+        <form onSubmit={handleSaveAboutPage} className="bg-white dark:bg-card border border-zinc-200 dark:border-border rounded-3xl p-6 sm:p-8 space-y-6 shadow-xs">
+          <div>
+            <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4" />
+              <span>About Us Page Copy & Content Management</span>
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Edit hero header, What Are We, Our Mission, How to Join Team, Impact Metrics, and FAQs list for the /about page.
+            </p>
+          </div>
+
+          <div className="space-y-4 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="font-semibold text-foreground block">Page Title</label>
+                <input
+                  type="text"
+                  required
+                  value={aboutTitle}
+                  onChange={(e) => setAboutTitle(e.target.value)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-xs text-foreground focus:outline-none focus:border-foreground"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="font-semibold text-foreground block">Page Subtitle</label>
+                <input
+                  type="text"
+                  required
+                  value={aboutSubtitle}
+                  onChange={(e) => setAboutSubtitle(e.target.value)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-xs text-foreground focus:outline-none focus:border-foreground"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground block">"What Are We" Description</label>
+              <textarea
+                rows={3}
+                required
+                value={aboutWhatAreWe}
+                onChange={(e) => setAboutWhatAreWe(e.target.value)}
+                className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-xs text-foreground focus:outline-none focus:border-foreground"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground block">"Our Mission" Description</label>
+              <textarea
+                rows={3}
+                required
+                value={aboutMission}
+                onChange={(e) => setAboutMission(e.target.value)}
+                className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-xs text-foreground focus:outline-none focus:border-foreground"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground block">"How to Join Our Team" Description</label>
+              <textarea
+                rows={3}
+                required
+                value={aboutJoinTeam}
+                onChange={(e) => setAboutJoinTeam(e.target.value)}
+                className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-xs text-foreground focus:outline-none focus:border-foreground"
+              />
+            </div>
+
+            {/* Impact Stats */}
+            <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 space-y-3">
+              <span className="font-bold text-foreground block">Impact Metrics Counters</span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[11px] text-muted-foreground font-semibold">Stat 1 Value & Label</label>
+                  <input
+                    type="text"
+                    value={aboutStat1Val}
+                    onChange={(e) => setAboutStat1Val(e.target.value)}
+                    className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-foreground mb-1"
+                  />
+                  <input
+                    type="text"
+                    value={aboutStat1Label}
+                    onChange={(e) => setAboutStat1Label(e.target.value)}
+                    className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-foreground"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-muted-foreground font-semibold">Stat 2 Value & Label</label>
+                  <input
+                    type="text"
+                    value={aboutStat2Val}
+                    onChange={(e) => setAboutStat2Val(e.target.value)}
+                    className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-foreground mb-1"
+                  />
+                  <input
+                    type="text"
+                    value={aboutStat2Label}
+                    onChange={(e) => setAboutStat2Label(e.target.value)}
+                    className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-foreground"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-muted-foreground font-semibold">Stat 3 Value & Label</label>
+                  <input
+                    type="text"
+                    value={aboutStat3Val}
+                    onChange={(e) => setAboutStat3Val(e.target.value)}
+                    className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-foreground mb-1"
+                  />
+                  <input
+                    type="text"
+                    value={aboutStat3Label}
+                    onChange={(e) => setAboutStat3Label(e.target.value)}
+                    className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-foreground"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* FAQs List Manager */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-foreground block">Frequently Asked Questions (FAQs)</span>
+                <button
+                  type="button"
+                  onClick={() => setAboutFaqs([...aboutFaqs, { q: 'New Question', a: 'Answer text...' }])}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-foreground text-xs font-semibold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add FAQ</span>
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {aboutFaqs.map((faq, idx) => (
+                  <div key={idx} className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 space-y-2 relative">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold text-foreground">FAQ #{idx + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => setAboutFaqs(aboutFaqs.filter((_, i) => i !== idx))}
+                        className="text-red-500 hover:text-red-600 p-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={faq.q}
+                      onChange={(e) => {
+                        const updated = [...aboutFaqs];
+                        updated[idx].q = e.target.value;
+                        setAboutFaqs(updated);
+                      }}
+                      placeholder="Question..."
+                      className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-foreground font-semibold"
+                    />
+                    <textarea
+                      rows={2}
+                      value={faq.a}
+                      onChange={(e) => {
+                        const updated = [...aboutFaqs];
+                        updated[idx].a = e.target.value;
+                        setAboutFaqs(updated);
+                      }}
+                      placeholder="Answer..."
+                      className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl p-2.5 text-xs text-muted-foreground"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-4 border-t border-zinc-200 dark:border-zinc-800">
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-6 py-2.5 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-semibold cursor-pointer shadow-xs"
+            >
+              {saving ? 'Saving...' : 'Save About Page Changes'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SECTION: CONTACT US PAGE CMS */}
+      {/* ========================================================================= */}
+      {activeTab === 'contact' && (
+        <form onSubmit={handleSaveContactPage} className="bg-white dark:bg-card border border-zinc-200 dark:border-border rounded-3xl p-6 sm:p-8 space-y-6 shadow-xs">
+          <div>
+            <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+              <Mail className="w-4 h-4" />
+              <span>Contact Us Page & Direct Channels Management</span>
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Configure support email, WhatsApp number & chat link, and official Discord ticket link.
+            </p>
+          </div>
+
+          <div className="space-y-4 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="font-semibold text-foreground block">Page Title</label>
+                <input
+                  type="text"
+                  required
+                  value={contactTitle}
+                  onChange={(e) => setContactTitle(e.target.value)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-xs text-foreground focus:outline-none focus:border-foreground"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="font-semibold text-foreground block">Support Email</label>
+                <input
+                  type="email"
+                  required
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-xs text-foreground focus:outline-none focus:border-foreground"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground block">Page Subtitle</label>
+              <input
+                type="text"
+                required
+                value={contactSubtitle}
+                onChange={(e) => setContactSubtitle(e.target.value)}
+                className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-xs text-foreground focus:outline-none focus:border-foreground"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="font-semibold text-foreground block">WhatsApp Number (Display)</label>
+                <input
+                  type="text"
+                  required
+                  value={contactWhatsapp}
+                  onChange={(e) => setContactWhatsapp(e.target.value)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-xs text-foreground focus:outline-none focus:border-foreground"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="font-semibold text-foreground block">WhatsApp Direct Chat Link (wa.me/...)</label>
+                <input
+                  type="text"
+                  required
+                  value={contactWhatsappLink}
+                  onChange={(e) => setContactWhatsappLink(e.target.value)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-xs text-foreground focus:outline-none focus:border-foreground"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground block">Discord Ticket Link URL</label>
+              <input
+                type="text"
+                required
+                value={contactDiscordUrl}
+                onChange={(e) => setContactDiscordUrl(e.target.value)}
+                className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-xs text-foreground focus:outline-none focus:border-foreground"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-4 border-t border-zinc-200 dark:border-zinc-800">
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-6 py-2.5 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-semibold cursor-pointer shadow-xs"
+            >
+              {saving ? 'Saving...' : 'Save Contact Page Changes'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SECTION: CAREERS PAGE CMS */}
+      {/* ========================================================================= */}
+      {activeTab === 'careers' && (
+        <form onSubmit={handleSaveCareersPage} className="bg-white dark:bg-card border border-zinc-200 dark:border-border rounded-3xl p-6 sm:p-8 space-y-6 shadow-xs">
+          <div>
+            <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+              <Briefcase className="w-4 h-4" />
+              <span>Careers Page & Open Positions CMS</span>
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Edit careers hero title, Discord ticket CTA URL, and manage open job positions.
+            </p>
+          </div>
+
+          <div className="space-y-4 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="font-semibold text-foreground block">Page Title</label>
+                <input
+                  type="text"
+                  required
+                  value={careersTitle}
+                  onChange={(e) => setCareersTitle(e.target.value)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-xs text-foreground focus:outline-none focus:border-foreground"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="font-semibold text-foreground block">Discord Recruitment Ticket URL</label>
+                <input
+                  type="text"
+                  required
+                  value={careersDiscordUrl}
+                  onChange={(e) => setCareersDiscordUrl(e.target.value)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-xs text-foreground focus:outline-none focus:border-foreground"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground block">Page Subtitle</label>
+              <textarea
+                rows={2}
+                required
+                value={careersSubtitle}
+                onChange={(e) => setCareersSubtitle(e.target.value)}
+                className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-xs text-foreground focus:outline-none focus:border-foreground"
+              />
+            </div>
+
+            {/* Open Positions List Manager */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-foreground block">Open Job Positions ({careersPositions.length})</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCareersPositions([
+                      ...careersPositions,
+                      {
+                        id: `pos_${Date.now()}`,
+                        title: 'New Position',
+                        type: 'Full-Time / Remote',
+                        department: 'General',
+                        desc: 'Job description...',
+                      },
+                    ])
+                  }
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-foreground text-xs font-semibold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Role</span>
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {careersPositions.map((pos, idx) => (
+                  <div key={pos.id || idx} className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold text-foreground">Role #{idx + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => setCareersPositions(careersPositions.filter((_, i) => i !== idx))}
+                        className="text-red-500 hover:text-red-600 p-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <input
+                        type="text"
+                        value={pos.title}
+                        onChange={(e) => {
+                          const updated = [...careersPositions];
+                          updated[idx].title = e.target.value;
+                          setCareersPositions(updated);
+                        }}
+                        placeholder="Job Title..."
+                        className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-foreground font-semibold"
+                      />
+                      <input
+                        type="text"
+                        value={pos.department}
+                        onChange={(e) => {
+                          const updated = [...careersPositions];
+                          updated[idx].department = e.target.value;
+                          setCareersPositions(updated);
+                        }}
+                        placeholder="Department..."
+                        className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-foreground"
+                      />
+                      <input
+                        type="text"
+                        value={pos.type}
+                        onChange={(e) => {
+                          const updated = [...careersPositions];
+                          updated[idx].type = e.target.value;
+                          setCareersPositions(updated);
+                        }}
+                        placeholder="Type (e.g. Full-Time / Remote)..."
+                        className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-foreground"
+                      />
+                    </div>
+
+                    <textarea
+                      rows={2}
+                      value={pos.desc}
+                      onChange={(e) => {
+                        const updated = [...careersPositions];
+                        updated[idx].desc = e.target.value;
+                        setCareersPositions(updated);
+                      }}
+                      placeholder="Role summary / responsibilities..."
+                      className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl p-2.5 text-xs text-muted-foreground"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-4 border-t border-zinc-200 dark:border-zinc-800">
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-6 py-2.5 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-semibold cursor-pointer shadow-xs"
+            >
+              {saving ? 'Saving...' : 'Save Careers Page Changes'}
             </button>
           </div>
         </form>
