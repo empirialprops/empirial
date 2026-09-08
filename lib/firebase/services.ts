@@ -16,6 +16,8 @@ import {
   limit, 
   increment,
   writeBatch,
+  runTransaction,
+  onSnapshot,
   DocumentData
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
@@ -1001,10 +1003,44 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 export async function syncUserProfile(profile: UserProfile): Promise<void> {
   if (!db) return;
   const docRef = doc(db, 'users', profile.uid);
+  const counterRef = doc(db, 'siteStats', 'counters');
+
+  // Check if this is a first-time registration (doc doesn't exist yet)
+  const existing = await getDoc(docRef);
+  const isNewUser = !existing.exists();
+
   await setDoc(docRef, {
     ...profile,
     updated_at: new Date().toISOString()
   }, { merge: true });
+
+  // Only increment the live counter on first registration
+  if (isNewUser) {
+    await setDoc(counterRef, { active_traders: increment(1) }, { merge: true });
+  }
+}
+
+/**
+ * Subscribe to the live active traders count from Firestore.
+ * Returns an unsubscribe function. Calls onChange(count) whenever the count updates.
+ */
+export function subscribeLiveActiveTraders(onChange: (count: number) => void): () => void {
+  if (!db) {
+    onChange(0);
+    return () => {};
+  }
+  const counterRef = doc(db, 'siteStats', 'counters');
+  const unsub = onSnapshot(counterRef, (snap) => {
+    if (snap.exists()) {
+      onChange(snap.data().active_traders ?? 0);
+    } else {
+      onChange(0);
+    }
+  }, (err) => {
+    console.error('Failed to subscribe to active traders count:', err);
+    onChange(0);
+  });
+  return unsub;
 }
 
 export async function validateReferralCode(code: string): Promise<string | null> {

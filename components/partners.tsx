@@ -137,7 +137,8 @@ export default function Partners() {
                   >
                     <img
                       src={firm.logo}
-                      alt={firm.name}
+                      alt={`${firm.name} logo`}
+                      loading="lazy"
                       className={`w-auto object-contain transition-transform duration-200 hover:scale-105 ${getSizeClass(
                         firm.size
                       )} ${getShapeClass(firm.shape)}`}

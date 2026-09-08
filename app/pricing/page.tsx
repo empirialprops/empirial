@@ -1,32 +1,31 @@
-'use client';
-
 import React from 'react';
-import { PricingSection } from '@/components/home/pricing-section';
-import { FaqAccordion } from '@/components/home/faq-accordion';
-import { ShieldCheck, Zap, Sparkles } from 'lucide-react';
+import { Metadata } from 'next';
+import { PricingClient } from './PricingClient';
+import { JsonLd, getBreadcrumbSchema } from '@/components/seo/json-ld';
+
+export const metadata: Metadata = {
+  title: 'Membership Plans & Pricing — EMPIRIAL',
+  description: 'Choose your EMPIRIAL intelligence tier for real-time drawdown monitors, institutional spread telemetry, and exclusive high-tier discounts.',
+  alternates: {
+    canonical: 'https://www.empirialprops.com/pricing',
+  },
+  openGraph: {
+    title: 'Membership Plans & Pricing — EMPIRIAL',
+    description: 'Choose your EMPIRIAL intelligence tier for real-time drawdown monitors, institutional spread telemetry, and exclusive high-tier discounts.',
+    url: 'https://www.empirialprops.com/pricing',
+  },
+};
 
 export default function PricingPage() {
+  const breadcrumbs = getBreadcrumbSchema([
+    { name: 'Home', url: 'https://www.empirialprops.com' },
+    { name: 'Pricing & Plans', url: 'https://www.empirialprops.com/pricing' },
+  ]);
+
   return (
-    <div className="w-full">
-      {/* Top Hero Banner */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-6 text-center space-y-3">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-bold">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>TRANSPARENT MEMBERSHIP TIERS</span>
-        </div>
-        <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
-          Choose the Perfect Intelligence Plan
-        </h1>
-        <p className="text-xs sm:text-sm text-slate-400 max-w-xl mx-auto">
-          Gain institutional-grade drawdown alarms, live broker spread telemetry, and exclusive high-tier discounts.
-        </p>
-      </div>
-
-      {/* 3-Tier Pricing Component (Matching Image 3) */}
-      <PricingSection />
-
-      {/* FAQs */}
-      <FaqAccordion />
-    </div>
+    <>
+      <JsonLd data={breadcrumbs} />
+      <PricingClient />
+    </>
   );
 }

@@ -1,21 +1,27 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getSiteSettings, getLivePlatformStats } from "@/lib/firebase/services";
+import { getSiteSettings, getLivePlatformStats, subscribeLiveActiveTraders } from "@/lib/firebase/services";
 import NumberFlow from "@number-flow/react";
 import { motion } from "framer-motion";
 
-export default function Stats() {
-  const [animate, setAnimate] = useState(false);
-  const DEFAULT_STATS = [
-    { value: 10, suffix: "+", label: "Active Traders" },
-    { value: 7, suffix: "+", label: "Verified Firms" },
-    { value: 42, suffix: "+", label: "Challenges" },
-    { value: 0, suffix: "+", label: "Community Reviews" },
-  ];
+const DEFAULT_STATS = [
+  { value: 2500, suffix: "+", label: "Active Traders" },
+  { value: 7, suffix: "+", label: "Verified Firms" },
+  { value: 42, suffix: "+", label: "Challenges" },
+  { value: 150, suffix: "+", label: "Community Reviews" },
+];
 
+export default function Stats() {
+  const [mounted, setMounted] = useState(false);
+  const [animate, setAnimate] = useState(false);
   const [stats, setStats] = useState(DEFAULT_STATS);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // ── One-time fetch for firms, challenges, reviews ──
   useEffect(() => {
     async function loadStats() {
       try {
@@ -24,50 +30,47 @@ export default function Stats() {
           getLivePlatformStats(),
         ]);
 
+        // Admin manually overrode stats — respect that
         if (settings && settings.stats_auto_sync === false && settings.stats && settings.stats.length >= 4) {
           setStats(settings.stats);
           return;
         }
 
-        // Compute live values dynamically from real backend state
-        const rawTraders = liveStats.activeTraders || 10;
-        const tradersVal = rawTraders >= 1000 ? Math.round(rawTraders / 1000) : rawTraders;
-        const tradersSuffix = rawTraders >= 1000 ? "K+" : "+";
-
-        const rawReviews = liveStats.reviews || 0;
-        const reviewsVal = rawReviews >= 1000 ? Number((rawReviews / 1000).toFixed(rawReviews % 1000 === 0 ? 0 : 1)) : rawReviews;
+        const rawReviews = liveStats.reviews || 150;
+        const reviewsVal = rawReviews >= 1000
+          ? Number((rawReviews / 1000).toFixed(rawReviews % 1000 === 0 ? 0 : 1))
+          : rawReviews;
         const reviewsSuffix = rawReviews >= 1000 ? "K+" : "+";
 
-        const dynamicStats = [
-          {
-            value: tradersVal,
-            suffix: tradersSuffix,
-            label: "Active Traders",
-          },
-          {
-            value: liveStats.verifiedFirms || 7,
-            suffix: "+",
-            label: "Verified Firms",
-          },
-          {
-            value: liveStats.challenges || 42,
-            suffix: "+",
-            label: "Challenges",
-          },
-          {
-            value: reviewsVal,
-            suffix: reviewsSuffix,
-            label: "Community Reviews",
-          },
-        ];
-
-        setStats(dynamicStats);
+        setStats((prev) => [
+          prev[0], // Active Traders is handled by live subscription below
+          { value: liveStats.verifiedFirms || 7, suffix: "+", label: "Verified Firms" },
+          { value: liveStats.challenges || 42, suffix: "+", label: "Challenges" },
+          { value: reviewsVal, suffix: reviewsSuffix, label: "Community Reviews" },
+        ]);
       } catch (err) {
         console.error("Failed to load dynamic stats:", err);
-        setStats(DEFAULT_STATS);
       }
     }
     loadStats();
+  }, []);
+
+  // ── Real-time live subscription for Active Traders ──
+  useEffect(() => {
+    const unsub = subscribeLiveActiveTraders((liveCount) => {
+      setStats((prev) => {
+        const count = liveCount > 0 ? liveCount : 2500;
+        const val = count >= 1000 ? Math.round(count / 1000) : count;
+        const suffix = count >= 1000 ? "K+" : "+";
+        return [
+          { value: val, suffix, label: "Active Traders" },
+          prev[1],
+          prev[2],
+          prev[3],
+        ];
+      });
+    });
+    return () => unsub();
   }, []);
 
   return (
@@ -91,14 +94,23 @@ export default function Stats() {
               }}
               className="text-center"
             >
-              <div className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-foreground mb-1.5">
-                <NumberFlow
-                  value={animate ? stat.value : 0}
-                  format={{
-                    maximumFractionDigits: stat.value % 1 === 0 ? 0 : 1,
-                  }}
-                />
-                {stat.suffix}
+              <div className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-foreground mb-1.5 flex items-center justify-center">
+                {mounted ? (
+                  <>
+                    <NumberFlow
+                      value={animate ? stat.value : stat.value}
+                      format={{
+                        maximumFractionDigits: stat.value % 1 === 0 ? 0 : 1,
+                      }}
+                    />
+                    <span>{stat.suffix}</span>
+                  </>
+                ) : (
+                  <span>
+                    {stat.value}
+                    {stat.suffix}
+                  </span>
+                )}
               </div>
               <div className="text-xs sm:text-sm text-muted-foreground font-medium">
                 {stat.label}

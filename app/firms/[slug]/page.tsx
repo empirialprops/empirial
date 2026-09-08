@@ -12,9 +12,10 @@ import {
   getChallengesByFirm,
   getDealsByFirm,
   getReviewsByFirm,
-  getPayoutsByFirm
+  getPayoutsByFirm,
 } from '@/lib/firebase/services';
 import { Challenge, Deal, Review, Payout } from '@/lib/types';
+import { JsonLd, getBreadcrumbSchema, getFirmReviewSchema } from '@/components/seo/json-ld';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -25,15 +26,23 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   let firmName = slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
   
   try {
-    const firm = await getFirmBySlug(slug);
+    const firm = await getFirmBySlug(slug) || MOCK_FIRMS.find((f) => f.slug === slug || f.id === slug);
     if (firm) {
       firmName = firm.name;
     }
   } catch (_) {}
 
   return {
-    title: `${firmName} Audited Specs, Coupons & Reviews | EMPIRIAL 2.0`,
-    description: `Complete audited prop trading metrics, challenge accounts pricing, active coupon codes, and verified trader payout proofs for ${firmName}.`,
+    title: `${firmName} Review 2026 — Rules, Payout Proof & Discount Code`,
+    description: `${firmName} evaluation rules, profit split, drawdown limits, verified payout proof and the latest discount code, reviewed by real traders.`,
+    alternates: {
+      canonical: `https://www.empirialprops.com/firms/${slug}`,
+    },
+    openGraph: {
+      title: `${firmName} Review 2026 — Rules, Payout Proof & Discount Code`,
+      description: `${firmName} evaluation rules, profit split, drawdown limits, verified payout proof and the latest discount code.`,
+      url: `https://www.empirialprops.com/firms/${slug}`,
+    },
   };
 }
 
@@ -53,7 +62,7 @@ export default async function FirmProfilePage({ params }: PageProps) {
         getChallengesByFirm(firm.id),
         getDealsByFirm(firm.id),
         getReviewsByFirm(firm.id),
-        getPayoutsByFirm(firm.id)
+        getPayoutsByFirm(firm.id),
       ]);
       firmChallenges = challs;
       firmDeals = deals;
@@ -66,7 +75,7 @@ export default async function FirmProfilePage({ params }: PageProps) {
 
   // Fallback to static mock datasets if Firestore has no records
   if (!firm) {
-    firm = MOCK_FIRMS.find((f) => f.slug === slug);
+    firm = MOCK_FIRMS.find((f) => f.slug === slug || f.id === slug);
   }
   if (!firm) {
     notFound();
@@ -84,13 +93,25 @@ export default async function FirmProfilePage({ params }: PageProps) {
     firmPayouts = MOCK_PAYOUTS.filter((p) => p.firm_id === firm!.id);
   }
 
+  const breadcrumbs = getBreadcrumbSchema([
+    { name: 'Home', url: 'https://www.empirialprops.com' },
+    { name: 'Verified Firms', url: 'https://www.empirialprops.com/firms' },
+    { name: firm.name, url: `https://www.empirialprops.com/firms/${firm.slug || slug}` },
+  ]);
+
+  const productSchema = getFirmReviewSchema(firm, firmReviews);
+
   return (
-    <FirmProfileClient
-      firm={firm}
-      firmChallenges={firmChallenges}
-      firmDeals={firmDeals}
-      firmReviews={firmReviews}
-      firmPayouts={firmPayouts}
-    />
+    <>
+      <JsonLd data={breadcrumbs} />
+      <JsonLd data={productSchema} />
+      <FirmProfileClient
+        firm={firm}
+        firmChallenges={firmChallenges}
+        firmDeals={firmDeals}
+        firmReviews={firmReviews}
+        firmPayouts={firmPayouts}
+      />
+    </>
   );
 }

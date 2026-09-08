@@ -287,6 +287,7 @@ export interface BlogPost {
   read_time: string;
   category: string;
   published_at: string;
+  updated_at?: string;
   cover_image: string;
 }
 

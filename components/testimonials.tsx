@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Button } from "./ui/button";
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
@@ -166,16 +167,43 @@ export default function Testimonials() {
           .toUpperCase()
       : "TR";
 
+    const getFirmLink = (roleText: string) => {
+      if (!roleText) return null;
+      const lower = roleText.toLowerCase();
+      if (lower.includes("nys")) return { name: "NYS Capital", href: "/firms/nys" };
+      if (lower.includes("gtf") || lower.includes("goat")) return { name: "Goat Funded Trader", href: "/firms/gtf" };
+      if (lower.includes("alpha")) return { name: "Alpha Capital", href: "/firms/alpha-capital" };
+      if (lower.includes("ck")) return { name: "CK Capital", href: "/firms/ck-capital" };
+      if (lower.includes("ftmo")) return { name: "FTMO", href: "/firms/ftmo" };
+      return null;
+    };
+
+    const firmTarget = getFirmLink(testimonial.role || "");
+
     return (
-      <div className="h-full rounded-2xl border border-zinc-200 dark:border-zinc-800/90 bg-white dark:bg-[#121215] p-5 sm:p-6 shadow-xs transition-all duration-300 hover:border-zinc-300 dark:hover:border-zinc-700 flex flex-col justify-between">
+      <div 
+        itemScope 
+        itemType="https://schema.org/Review" 
+        className="h-full rounded-2xl border border-zinc-200 dark:border-zinc-800/90 bg-white dark:bg-[#121215] p-5 sm:p-6 shadow-xs transition-all duration-300 hover:border-zinc-300 dark:hover:border-zinc-700 flex flex-col justify-between"
+      >
         <div>
-          <div className="mb-3 sm:mb-4 flex items-center gap-1">
+          <div 
+            itemProp="reviewRating" 
+            itemScope 
+            itemType="https://schema.org/Rating"
+            className="mb-3 sm:mb-4 flex items-center gap-1"
+          >
+            <meta itemProp="ratingValue" content={(testimonial.rating || 5).toString()} />
+            <meta itemProp="bestRating" content="5" />
             {[...Array(testimonial.rating || 5)].map((_, i) => (
               <StarIcon key={i} />
             ))}
           </div>
 
-          <p className="mb-5 sm:mb-6 text-xs sm:text-sm leading-relaxed text-zinc-700 dark:text-zinc-300 font-normal">
+          <p 
+            itemProp="reviewBody" 
+            className="mb-5 sm:mb-6 text-xs sm:text-sm leading-relaxed text-zinc-700 dark:text-zinc-300 font-normal"
+          >
             &ldquo;{testimonial.content}&rdquo;
           </p>
         </div>
@@ -185,12 +213,25 @@ export default function Testimonials() {
             {initials}
           </div>
           <div className="min-w-0 flex-1">
-            <h4 className="truncate text-xs sm:text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-              {testimonial.name}
+            <h4 
+              itemProp="author" 
+              itemScope 
+              itemType="https://schema.org/Person" 
+              className="truncate text-xs sm:text-sm font-semibold text-zinc-900 dark:text-zinc-100"
+            >
+              <span itemProp="name">{testimonial.name}</span>
             </h4>
-            <p className="truncate text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400 font-medium">
-              {testimonial.role}
-            </p>
+            <div className="truncate text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400 font-medium flex items-center gap-1">
+              <span>{testimonial.role}</span>
+              {firmTarget && (
+                <Link 
+                  href={firmTarget.href} 
+                  className="text-foreground underline hover:text-muted-foreground ml-1 font-semibold"
+                >
+                  (View Firm)
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </div>
