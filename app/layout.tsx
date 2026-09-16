@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import NavBar from '@/components/navbar';
@@ -76,6 +77,24 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="bg-background text-foreground antialiased min-h-screen flex flex-col transition-colors duration-200">
+        {/* Google Analytics (gtag.js) */}
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-S8LMTLWN4G"
+          strategy="afterInteractive"
+        />
+        <Script
+          id="google-analytics"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'G-S8LMTLWN4G');
+            `,
+          }}
+        />
+
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
           {/* Global Structured Data */}
           <JsonLd data={getOrganizationSchema()} />
