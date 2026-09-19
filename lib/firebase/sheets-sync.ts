@@ -1,6 +1,6 @@
 /**
  * Google Sheets Integration Module
- * Automatically appends new Firebase signup user details into a target Google Sheet via Apps Script Webhook.
+ * Automatically appends new & existing Firebase user details into target Google Sheet via Apps Script Webhook.
  * Target Sheet ID: 1vc2xSb3i8RR1Pec0h6poBiwwa68VhN9aiJ7J8bShCNA
  */
 
@@ -17,7 +17,7 @@ export interface SheetUserPayload {
 export const DEFAULT_SHEETS_WEBHOOK_URL = process.env.NEXT_PUBLIC_GOOGLE_SHEETS_WEBHOOK_URL || '';
 
 /**
- * Dispatch new user signup data to Google Apps Script Webhook.
+ * Dispatch single user signup data to Google Apps Script Webhook.
  */
 export async function syncUserToGoogleSheet(payload: SheetUserPayload, webhookUrl: string = DEFAULT_SHEETS_WEBHOOK_URL): Promise<{ success: boolean; error?: string }> {
   if (!webhookUrl || webhookUrl.trim() === '') {
@@ -35,7 +35,6 @@ export async function syncUserToGoogleSheet(payload: SheetUserPayload, webhookUr
       createdAt: payload.createdAt || new Date().toISOString(),
     };
 
-    // Use mode: 'no-cors' or text POST for Apps Script compatibility
     await fetch(webhookUrl, {
       method: 'POST',
       headers: {
@@ -45,10 +44,56 @@ export async function syncUserToGoogleSheet(payload: SheetUserPayload, webhookUr
       mode: 'no-cors',
     });
 
-    console.log('[Google Sheets Sync] Successfully dispatched new user to Google Sheet:', payload.email);
+    console.log('[Google Sheets Sync] Successfully dispatched user to Google Sheet:', payload.email);
     return { success: true };
   } catch (err: any) {
     console.error('[Google Sheets Sync] Failed to dispatch user to Google Sheet:', err);
     return { success: false, error: err?.message || 'Network request failed' };
+  }
+}
+
+/**
+ * Fetch all existing users from Firestore and sync them to Google Sheets in bulk.
+ */
+export async function syncAllExistingUsersToGoogleSheet(webhookUrl: string = DEFAULT_SHEETS_WEBHOOK_URL): Promise<{ success: boolean; count: number; error?: string }> {
+  if (!webhookUrl || webhookUrl.trim() === '') {
+    console.warn('[Google Sheets Sync] Webhook URL not configured for batch sync.');
+    return { success: false, count: 0, error: 'Webhook URL not set' };
+  }
+
+  try {
+    const { collection, getDocs } = await import('firebase/firestore');
+    const { db } = await import('./config');
+    if (!db) return { success: false, count: 0, error: 'Database not initialized' };
+
+    const snap = await getDocs(collection(db, 'users'));
+    if (snap.empty) return { success: true, count: 0 };
+
+    const usersList: SheetUserPayload[] = snap.docs.map(doc => {
+      const u = doc.data();
+      return {
+        uid: u.uid || doc.id,
+        name: u.displayName || u.name || 'Trader',
+        email: u.email || '',
+        phone: u.phoneNumber || u.phone || 'N/A',
+        provider: u.provider || (u.email?.includes('gmail') ? 'google.com' : 'password'),
+        createdAt: u.created_at || u.createdAt || new Date().toISOString(),
+      };
+    });
+
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8',
+      },
+      body: JSON.stringify({ users: usersList }),
+      mode: 'no-cors',
+    });
+
+    console.log(`[Google Sheets Sync] Successfully dispatched ${usersList.length} existing users to Google Sheet.`);
+    return { success: true, count: usersList.length };
+  } catch (err: any) {
+    console.error('[Google Sheets Sync] Failed to sync existing users:', err);
+    return { success: false, count: 0, error: err?.message || 'Sync failed' };
   }
 }

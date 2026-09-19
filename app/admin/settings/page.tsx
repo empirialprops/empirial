@@ -4,8 +4,12 @@ import React, { useState, useEffect } from 'react';
 import { Settings, CheckCircle2, Database, AlertTriangle, Globe, Shield, ShieldCheck } from 'lucide-react';
 import { seedDatabase } from '@/lib/firebase/seeder';
 import { getSiteSettings, updateSiteSettings, invalidateSiteSettingsCache } from '@/lib/firebase/services';
+import { syncAllExistingUsersToGoogleSheet, DEFAULT_SHEETS_WEBHOOK_URL } from '@/lib/firebase/sheets-sync';
 
 export default function AdminSettingsPage() {
+  const [sheetsSyncing, setSheetsSyncing] = useState(false);
+  const [sheetsSyncMsg, setSheetsSyncMsg] = useState('');
+  const [sheetsWebhookInput, setSheetsWebhookInput] = useState('');
   const [brandName, setBrandName] = useState('EMPIRIAL');
   const [shortName, setShortName] = useState('EMP');
   const [tagline, setTagline] = useState('Prop Trading Intelligence Matrix');
@@ -171,6 +175,28 @@ export default function AdminSettingsPage() {
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
       console.error('Failed to save settings:', err);
+    }
+  };
+
+  const handleSyncExistingUsersToSheet = async () => {
+    const targetUrl = sheetsWebhookInput.trim() || DEFAULT_SHEETS_WEBHOOK_URL;
+    if (!targetUrl) {
+      alert('Please enter your Google Apps Script Webhook URL first.');
+      return;
+    }
+    setSheetsSyncing(true);
+    setSheetsSyncMsg('');
+    try {
+      const res = await syncAllExistingUsersToGoogleSheet(targetUrl);
+      if (res.success) {
+        setSheetsSyncMsg(`Successfully exported ${res.count} existing user(s) to Google Sheet!`);
+      } else {
+        setSheetsSyncMsg(`Sync failed: ${res.error || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      setSheetsSyncMsg(`Sync failed: ${err.message}`);
+    } finally {
+      setSheetsSyncing(false);
     }
   };
 
@@ -683,6 +709,61 @@ export default function AdminSettingsPage() {
           <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-xs text-emerald-400 font-bold flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4" />
             <span>All mock records successfully seeded into Firestore!</span>
+          </div>
+        )}
+      </div>
+
+      {/* Google Sheets Bulk Export Utility */}
+      <div className="bg-elevation-surface border border-white/10 rounded-2xl p-6 sm:p-8 space-y-6">
+        <div className="flex items-center gap-2.5">
+          <Globe className="w-5 h-5 text-cyan-400" />
+          <h2 className="text-base font-bold text-white">Google Sheets User Export & Sync</h2>
+        </div>
+
+        <p className="text-xs text-slate-400 leading-relaxed">
+          Export all previously registered users from Firestore to your Google Sheet (<code className="text-white font-mono">1vc2xSb3i8RR1Pec0h6poBiwwa68VhN9aiJ7J8bShCNA</code>) using your deployed Google Apps Script Webhook.
+        </p>
+
+        <div className="space-y-3">
+          <label className="text-xs text-slate-400 font-medium block">Google Apps Script Webhook URL</label>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="url"
+              value={sheetsWebhookInput}
+              onChange={(e) => setSheetsWebhookInput(e.target.value)}
+              placeholder={DEFAULT_SHEETS_WEBHOOK_URL || "https://script.google.com/macros/s/.../exec"}
+              className="flex-1 bg-elevation-base border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-white/30"
+            />
+            <button
+              type="button"
+              onClick={handleSyncExistingUsersToSheet}
+              disabled={sheetsSyncing}
+              className={`px-5 py-2.5 rounded-xl font-bold text-xs whitespace-nowrap shadow cursor-pointer transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
+                sheetsSyncing
+                  ? 'bg-zinc-800 text-zinc-400 cursor-not-allowed'
+                  : 'bg-white hover:bg-zinc-200 text-black font-bold'
+              }`}
+            >
+              {sheetsSyncing ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
+                  <span>Exporting Users...</span>
+                </>
+              ) : (
+                <span>Sync All Existing Users to Sheet</span>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {sheetsSyncMsg && (
+          <div className={`p-4 rounded-xl text-xs font-bold flex items-center gap-2 ${
+            sheetsSyncMsg.includes('Successfully')
+              ? 'bg-emerald-500/5 border border-emerald-500/20 text-emerald-400'
+              : 'bg-red-500/5 border border-red-500/20 text-red-400'
+          }`}>
+            <CheckCircle2 className="w-4 h-4" />
+            <span>{sheetsSyncMsg}</span>
           </div>
         )}
       </div>
