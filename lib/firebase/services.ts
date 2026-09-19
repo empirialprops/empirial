@@ -1,5 +1,6 @@
 import { db, storage } from './config';
 import type { UserProfile } from '../utils/auth-store';
+import { syncUserToGoogleSheet } from './sheets-sync';
 import { getStoredDeals, saveStoredDeals, sortDeals } from '../utils/deals-store';
 import { 
   collection, 
@@ -1098,9 +1099,19 @@ export async function syncUserProfile(profile: UserProfile): Promise<void> {
     updated_at: new Date().toISOString()
   }, { merge: true });
 
-  // Only increment the live counter on first registration
+  // Only increment the live counter and sync to Google Sheet on first registration
   if (isNewUser) {
     await setDoc(counterRef, { active_traders: increment(1) }, { merge: true });
+    
+    // Dispatch new registration details to Google Sheet webhook
+    syncUserToGoogleSheet({
+      uid: profile.uid,
+      name: profile.displayName || 'Anonymous Trader',
+      email: profile.email || '',
+      phone: profile.phoneNumber || '',
+      provider: profile.email ? (profile.email.includes('gmail') ? 'google.com' : 'password') : 'google.com',
+      createdAt: new Date().toISOString(),
+    }).catch(err => console.warn('[Google Sheets Sync] Webhook sync error:', err));
   }
 }
 
