@@ -17,7 +17,7 @@ export function OfferPosterModal() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    // Load config
+    // 1. Load initial local config
     const currentConfig = getStoredOfferPoster();
     setConfig(currentConfig);
 
@@ -27,19 +27,50 @@ export function OfferPosterModal() {
 
     window.addEventListener('offer-poster-changed' as any, handleConfigChange);
 
-    // Check session storage: shows once per website session
+    // 2. Initial Session Check: shows once per session unless updated by admin
     if (typeof window !== 'undefined' && currentConfig.enabled) {
       const alreadySeen = sessionStorage.getItem(SESSION_DISMISSED_KEY);
       if (!alreadySeen) {
         const timer = setTimeout(() => {
           setIsOpen(true);
         }, 500);
-        return () => clearTimeout(timer);
       }
     }
 
+    // 3. Real-time Firestore Subscription for Instant Mobile & Desktop Sync
+    let unsubFirestore: (() => void) | undefined;
+    import('@/lib/firebase/services').then(({ subscribeToOfferPoster }) => {
+      unsubFirestore = subscribeToOfferPoster((remoteConfig) => {
+        if (!remoteConfig) return;
+        
+        setConfig((prev) => {
+          // If remote config has a newer timestamp or different content
+          const prevTime = prev.updatedAt || 0;
+          const remoteTime = remoteConfig.updatedAt || 0;
+
+          if (remoteTime > prevTime || JSON.stringify(prev) !== JSON.stringify(remoteConfig)) {
+            // Save to localStorage for offline cache
+            try {
+              localStorage.setItem('empirial_offer_poster_config', JSON.stringify(remoteConfig));
+            } catch (_) {}
+
+            // Re-open popup for users if new admin update is pushed
+            if (remoteConfig.enabled) {
+              if (typeof window !== 'undefined') {
+                sessionStorage.removeItem(SESSION_DISMISSED_KEY);
+              }
+              setIsOpen(true);
+            }
+            return remoteConfig;
+          }
+          return prev;
+        });
+      });
+    }).catch((err) => console.warn('Failed to connect real-time offer poster listener:', err));
+
     return () => {
       window.removeEventListener('offer-poster-changed' as any, handleConfigChange);
+      if (unsubFirestore) unsubFirestore();
     };
   }, []);
 

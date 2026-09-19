@@ -46,6 +46,17 @@ export default function AdminSettingsPage() {
   const [stat4Suffix, setStat4Suffix] = useState('+');
   const [stat4Label, setStat4Label] = useState('Active Challenges');
 
+  // Contact Page Query Categories State
+  const DEFAULT_QUERY_CATEGORIES = [
+    'Prop Firm Audit Request',
+    'Advertising & Promo Listing',
+    'Payout Proof Dispute Verification',
+    'Careers / Join EMPIRIAL Team',
+    'General Support & Inquiry',
+  ];
+  const [queryCategories, setQueryCategories] = useState<string[]>(DEFAULT_QUERY_CATEGORIES);
+  const [newCategoryInput, setNewCategoryInput] = useState('');
+
   useEffect(() => {
     async function loadSettings() {
       try {
@@ -66,6 +77,10 @@ export default function AdminSettingsPage() {
           setFavicon(settings.faviconUrl || '/favicon.ico');
           setMaintenance(settings.maintenanceMode ?? false);
           setEventPopup(settings.eventPopupEnabled ?? true);
+
+          if (settings.contactPage?.queryCategories && settings.contactPage.queryCategories.length > 0) {
+            setQueryCategories(settings.contactPage.queryCategories);
+          }
 
           if (settings.stats && settings.stats.length >= 4) {
             setStat1Value(settings.stats[0].value);
@@ -141,6 +156,7 @@ export default function AdminSettingsPage() {
           whatsapp: contactWhatsapp,
           whatsappLink: contactWhatsappLink,
           discordUrl: discordUrl,
+          queryCategories: queryCategories,
         },
         maintenanceMode: maintenance,
         eventPopupEnabled: eventPopup,
@@ -284,6 +300,54 @@ export default function AdminSettingsPage() {
                 className="bg-elevation-base border border-white/10 rounded-xl px-3 py-2 text-white"
               />
             </div>
+          </div>
+        </div>
+
+        {/* Contact Page Inquiry Categories */}
+        <div className="space-y-4 pt-4 border-t border-white/5">
+          <h3 className="text-sm font-bold text-white flex items-center gap-2 border-b border-white/5 pb-2">
+            <Globe className="w-4 h-4 text-cyan-400" />
+            <span>Contact Page Inquiry Categories (Select Dropdown Options)</span>
+          </h3>
+          <p className="text-xs text-slate-400">
+            Configure the categories available in the "Inquiry Category" select dropdown on the public Contact Page.
+          </p>
+
+          <div className="space-y-2 max-w-2xl">
+            {queryCategories.map((cat, idx) => (
+              <div key={idx} className="flex items-center gap-2 bg-elevation-base border border-white/10 px-3 py-2 rounded-xl text-xs">
+                <span className="flex-1 text-white font-medium">{cat}</span>
+                <button
+                  type="button"
+                  onClick={() => setQueryCategories(queryCategories.filter((_, i) => i !== idx))}
+                  className="text-red-400 hover:text-red-300 text-xs px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/20 font-semibold cursor-pointer transition-colors"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2 max-w-2xl">
+            <input
+              type="text"
+              value={newCategoryInput}
+              onChange={(e) => setNewCategoryInput(e.target.value)}
+              placeholder="e.g. Sponsorship & Event Partnerships"
+              className="flex-1 bg-elevation-base border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-white/30"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                if (newCategoryInput.trim()) {
+                  setQueryCategories([...queryCategories, newCategoryInput.trim()]);
+                  setNewCategoryInput('');
+                }
+              }}
+              className="px-4 py-2 bg-white text-black font-semibold rounded-xl text-xs hover:bg-zinc-200 transition-colors cursor-pointer"
+            >
+              Add Category
+            </button>
           </div>
         </div>
 

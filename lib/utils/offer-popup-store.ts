@@ -11,6 +11,7 @@ export interface OfferPosterConfig {
   posterImageUrl?: string;
   benefits: string[];
   extraNote?: string;
+  updatedAt?: number;
 }
 
 export const DEFAULT_OFFER_POSTER: OfferPosterConfig = {
@@ -30,6 +31,7 @@ export const DEFAULT_OFFER_POSTER: OfferPosterConfig = {
     "Special VIP Support via Discord (Link in Bio)",
   ],
   extraNote: "Valid till Friday 5 PM EST. 1 Lucky buyer gets a 100% Free Account!",
+  updatedAt: 1,
 };
 
 const STORAGE_KEY = "empirial_offer_poster_config";
@@ -47,19 +49,40 @@ export function getStoredOfferPoster(): OfferPosterConfig {
 
 export function saveOfferPoster(config: OfferPosterConfig): void {
   if (typeof window === "undefined") return;
+  const configWithTimestamp: OfferPosterConfig = {
+    ...config,
+    updatedAt: Date.now(),
+  };
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-    window.dispatchEvent(new CustomEvent("offer-poster-changed", { detail: config }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(configWithTimestamp));
+    window.dispatchEvent(new CustomEvent("offer-poster-changed", { detail: configWithTimestamp }));
   } catch (err) {
     console.error("Failed to save offer poster config", err);
   }
+
+  // Sync to Firestore siteSettings asynchronously for multi-device real-time sync
+  import('@/lib/firebase/services').then(({ updateSiteSettings, invalidateSiteSettingsCache }) => {
+    invalidateSiteSettingsCache();
+    updateSiteSettings({ offerPoster: configWithTimestamp });
+  }).catch((err) => console.warn("Failed to sync offer poster to Firestore:", err));
 }
 
 export function resetOfferPoster(): OfferPosterConfig {
-  if (typeof window === "undefined") return DEFAULT_OFFER_POSTER;
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-    window.dispatchEvent(new CustomEvent("offer-poster-changed", { detail: DEFAULT_OFFER_POSTER }));
-  } catch {}
-  return DEFAULT_OFFER_POSTER;
+  const resetConfig: OfferPosterConfig = {
+    ...DEFAULT_OFFER_POSTER,
+    updatedAt: Date.now(),
+  };
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      window.dispatchEvent(new CustomEvent("offer-poster-changed", { detail: resetConfig }));
+    } catch {}
+  }
+  
+  import('@/lib/firebase/services').then(({ updateSiteSettings, invalidateSiteSettingsCache }) => {
+    invalidateSiteSettingsCache();
+    updateSiteSettings({ offerPoster: resetConfig });
+  }).catch(() => {});
+
+  return resetConfig;
 }

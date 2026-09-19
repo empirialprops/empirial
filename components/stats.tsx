@@ -6,7 +6,7 @@ import NumberFlow from "@number-flow/react";
 import { motion } from "framer-motion";
 
 const DEFAULT_STATS = [
-  { value: 2500, suffix: "+", label: "Active Traders" },
+  { value: 50, suffix: "K+", label: "Active Traders" },
   { value: 7, suffix: "+", label: "Verified Firms" },
   { value: 42, suffix: "+", label: "Challenges" },
   { value: 150, suffix: "+", label: "Community Reviews" },
@@ -59,8 +59,8 @@ export default function Stats() {
   useEffect(() => {
     const unsub = subscribeLiveActiveTraders((liveCount) => {
       setStats((prev) => {
-        const count = liveCount > 0 ? liveCount : 2500;
-        const val = count >= 1000 ? Math.round(count / 1000) : count;
+        const count = liveCount > 0 ? liveCount : 50000;
+        const val = count >= 1000 ? Number((count / 1000).toFixed(count % 1000 === 0 ? 0 : 1)) : count;
         const suffix = count >= 1000 ? "K+" : "+";
         return [
           { value: val, suffix, label: "Active Traders" },

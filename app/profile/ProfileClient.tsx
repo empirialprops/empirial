@@ -77,7 +77,7 @@ import { MOCK_EVENTS } from '@/lib/data/events-data';
 import { MOCK_FIRMS } from '@/lib/data/firms-data';
 import { db } from '@/lib/firebase/config';
 import { doc, setDoc } from 'firebase/firestore';
-import { getReferralStats, subscribeToUserSupportTickets } from '@/lib/firebase/services';
+import { getReferralStats, subscribeToUserSupportTickets, subscribeToSingleSupportTicket, getLoyaltyRewards } from '@/lib/firebase/services';
 
 export function ProfileClient() {
   const [currentUser, setCurrentUser] = useState<UserProfile>(DEMO_TRADER);
@@ -148,8 +148,9 @@ export function ProfileClient() {
   const [liveVisitors, setLiveVisitors] = useState(0);
   const [liveRegistrations, setLiveRegistrations] = useState(0);
   const [liveConversionRate, setLiveConversionRate] = useState(0);
+  const [catalogRewards, setCatalogRewards] = useState<any[]>([]);
 
-  // Fetch live referral stats
+  // Fetch live referral stats & loyalty rewards catalog from Firestore
   useEffect(() => {
     if (currentUser && currentUser.uid) {
       getReferralStats(currentUser.uid).then((stats) => {
@@ -159,6 +160,12 @@ export function ProfileClient() {
         setReferralsList(stats.referralsList);
       }).catch(err => console.error("Failed to fetch live referrals stats:", err));
     }
+
+    getLoyaltyRewards().then((rewards) => {
+      if (rewards && rewards.length > 0) {
+        setCatalogRewards(rewards.filter((r: any) => r.is_active !== false));
+      }
+    }).catch(err => console.error("Failed to load loyalty rewards catalog:", err));
   }, [activeTab, currentUser.uid]);
 
   // Load initial data
@@ -238,8 +245,21 @@ export function ProfileClient() {
     return () => unsubscribe();
   }, [currentUser?.uid]);
 
-  // Auto-scroll trader ticket chat thread to bottom on message updates
   const activeSelectedTicket = ticketsList.find((t) => t.id === selectedTicketId) || ticketsList[0];
+
+  // Subscribe to real-time single ticket document live updates
+  useEffect(() => {
+    if (!activeSelectedTicket?.id) return;
+    const unsubSingle = subscribeToSingleSupportTicket(activeSelectedTicket.id, (updatedTicketDoc) => {
+      if (!updatedTicketDoc) return;
+      setTicketsList((prev) =>
+        prev.map((t) => (t.id === updatedTicketDoc.id ? { ...t, ...updatedTicketDoc } : t))
+      );
+    });
+    return () => unsubSingle();
+  }, [activeSelectedTicket?.id]);
+
+  // Auto-scroll trader ticket chat thread to bottom on message updates
   useEffect(() => {
     if (traderChatBottomRef.current) {
       traderChatBottomRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -1758,282 +1778,196 @@ export function ProfileClient() {
                     {isMilestoneUnlocked ? '● Redemptions Unlocked' : '● Redemptions Locked (100 Ref. Req.)'}
                   </span>
                 </div>
-              </div>
-
-              {/* Reward Cards Grid */}
+                     {/* Reward Cards Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                
-                {/* Reward 1: $100 Cash */}
-                <div className="p-6 rounded-3xl bg-white dark:bg-card border border-zinc-200 dark:border-border shadow-xs flex flex-col justify-between space-y-4 hover:border-zinc-400 dark:hover:border-zinc-600 transition-all">
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between">
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 text-[10px] font-extrabold uppercase tracking-wider">
-                        Direct Cash Payout
-                      </span>
-                      <div className="text-right">
-                        <span className="text-lg font-extrabold text-foreground">$100.00</span>
-                        <p className="text-[10px] text-muted-foreground">USD Transfer</p>
+                {catalogRewards && catalogRewards.length > 0 ? (
+                  catalogRewards.map((reward) => (
+                    <div
+                      key={reward.id}
+                      className="p-6 rounded-3xl bg-white dark:bg-card border border-zinc-200 dark:border-border shadow-xs flex flex-col justify-between space-y-4 hover:border-zinc-400 dark:hover:border-zinc-600 transition-all"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between">
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 text-[10px] font-extrabold uppercase tracking-wider">
+                            {reward.category?.toUpperCase() || 'REWARD'}
+                          </span>
+                          <div className="text-right">
+                            <span className="text-lg font-extrabold text-foreground">{reward.reward_value}</span>
+                            <p className="text-[10px] text-muted-foreground">Value</p>
+                          </div>
+                        </div>
+                        <div>
+                          <h4 className="text-base font-bold text-foreground">{reward.title}</h4>
+                          <p className="text-xs text-muted-foreground mt-1 leading-relaxed line-clamp-2">
+                            {reward.description}
+                          </p>
+                        </div>
+                        <div className="pt-2 flex items-center justify-between text-xs font-semibold border-t border-zinc-100 dark:border-zinc-800">
+                          <span className="text-muted-foreground">Cost:</span>
+                          <span className="text-foreground font-mono font-bold">
+                            {(reward.points_cost || reward.pointsCost || 0).toLocaleString()} Points
+                          </span>
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenRewardRedeem({
+                          id: reward.id,
+                          title: reward.title,
+                          category: reward.category || 'cash',
+                          pointsCost: reward.points_cost || reward.pointsCost || 1000,
+                          valueDisplay: reward.reward_value || '$100.00 USD',
+                          description: reward.description || '',
+                          tag: reward.title,
+                        })}
+                        className={`w-full py-2.5 rounded-xl text-xs font-semibold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer ${
+                          isMilestoneUnlocked
+                            ? 'bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200'
+                            : 'border border-zinc-200 bg-zinc-100 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 hover:text-foreground'
+                        }`}
+                      >
+                        {isMilestoneUnlocked ? <Wallet className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                        <span>{isMilestoneUnlocked ? `Redeem ${reward.title}` : 'Redeem (100 Invites Req.)'}</span>
+                      </button>
                     </div>
-                    <div>
-                      <h4 className="text-base font-bold text-foreground">$100 Direct Cash Transfer</h4>
-                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                        Direct wire transfer to your Bank Account or USDT (TRC20/ERC20) Crypto wallet.
-                      </p>
-                    </div>
-                    <div className="pt-2 flex items-center justify-between text-xs font-semibold border-t border-zinc-100 dark:border-zinc-800">
-                      <span className="text-muted-foreground">Cost:</span>
-                      <span className="text-foreground font-mono font-bold">10,000 Points</span>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenRewardRedeem({
-                      id: 'rew-cash-100',
-                      title: '$100 Direct Cash Transfer',
-                      category: 'cash',
-                      pointsCost: 10000,
-                      valueDisplay: '$100.00 USD',
-                      description: 'Bank Wire Transfer or USDT Crypto Payout',
-                      tag: 'Direct Cash',
-                    })}
-                    className={`w-full py-2.5 rounded-xl text-xs font-semibold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer ${
-                      isMilestoneUnlocked
-                        ? 'bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200'
-                        : 'border border-zinc-200 bg-zinc-100 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 hover:text-foreground'
-                    }`}
-                  >
-                    {isMilestoneUnlocked ? <Wallet className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-                    <span>{isMilestoneUnlocked ? 'Redeem $100 Cash' : 'Redeem (100 Invites Req.)'}</span>
-                  </button>
-                </div>
-
-                {/* Reward 2: $250 Cash */}
-                <div className="p-6 rounded-3xl bg-white dark:bg-card border border-zinc-200 dark:border-border shadow-xs flex flex-col justify-between space-y-4 hover:border-zinc-400 dark:hover:border-zinc-600 transition-all">
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between">
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 text-[10px] font-extrabold uppercase tracking-wider">
-                        Direct Cash Payout
-                      </span>
-                      <div className="text-right">
-                        <span className="text-lg font-extrabold text-foreground">$250.00</span>
-                        <p className="text-[10px] text-muted-foreground">USD Transfer</p>
+                  ))
+                ) : (
+                  <>
+                    {/* Fallback Static Cards */}
+                    <div className="p-6 rounded-3xl bg-white dark:bg-card border border-zinc-200 dark:border-border shadow-xs flex flex-col justify-between space-y-4 hover:border-zinc-400 dark:hover:border-zinc-600 transition-all">
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between">
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 text-[10px] font-extrabold uppercase tracking-wider">
+                            Direct Cash Payout
+                          </span>
+                          <div className="text-right">
+                            <span className="text-lg font-extrabold text-foreground">$100.00</span>
+                            <p className="text-[10px] text-muted-foreground">USD Transfer</p>
+                          </div>
+                        </div>
+                        <div>
+                          <h4 className="text-base font-bold text-foreground">$100 Direct Cash Transfer</h4>
+                          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                            Direct wire transfer to your Bank Account or USDT (TRC20/ERC20) Crypto wallet.
+                          </p>
+                        </div>
+                        <div className="pt-2 flex items-center justify-between text-xs font-semibold border-t border-zinc-100 dark:border-zinc-800">
+                          <span className="text-muted-foreground">Cost:</span>
+                          <span className="text-foreground font-mono font-bold">10,000 Points</span>
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenRewardRedeem({
+                          id: 'rew-cash-100',
+                          title: '$100 Direct Cash Transfer',
+                          category: 'cash',
+                          pointsCost: 10000,
+                          valueDisplay: '$100.00 USD',
+                          description: 'Bank Wire Transfer or USDT Crypto Payout',
+                          tag: 'Direct Cash',
+                        })}
+                        className={`w-full py-2.5 rounded-xl text-xs font-semibold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer ${
+                          isMilestoneUnlocked
+                            ? 'bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200'
+                            : 'border border-zinc-200 bg-zinc-100 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 hover:text-foreground'
+                        }`}
+                      >
+                        {isMilestoneUnlocked ? <Wallet className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                        <span>{isMilestoneUnlocked ? 'Redeem $100 Cash' : 'Redeem (100 Invites Req.)'}</span>
+                      </button>
                     </div>
-                    <div>
-                      <h4 className="text-base font-bold text-foreground">$250 Direct Cash Transfer</h4>
-                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                        Fast direct settlement to your verified bank account or crypto wallet.
-                      </p>
-                    </div>
-                    <div className="pt-2 flex items-center justify-between text-xs font-semibold border-t border-zinc-100 dark:border-zinc-800">
-                      <span className="text-muted-foreground">Cost:</span>
-                      <span className="text-foreground font-mono font-bold">25,000 Points</span>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenRewardRedeem({
-                      id: 'rew-cash-250',
-                      title: '$250 Direct Cash Transfer',
-                      category: 'cash',
-                      pointsCost: 25000,
-                      valueDisplay: '$250.00 USD',
-                      description: 'Bank Wire Transfer or USDT Crypto Payout',
-                      tag: 'Direct Cash',
-                    })}
-                    className={`w-full py-2.5 rounded-xl text-xs font-semibold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer ${
-                      isMilestoneUnlocked
-                        ? 'bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200'
-                        : 'border border-zinc-200 bg-zinc-100 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 hover:text-foreground'
-                    }`}
-                  >
-                    {isMilestoneUnlocked ? <Wallet className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-                    <span>{isMilestoneUnlocked ? 'Redeem $250 Cash' : 'Redeem (100 Invites Req.)'}</span>
-                  </button>
-                </div>
 
-                {/* Reward 3: NYS Capital $100K Challenge */}
-                <div className="p-6 rounded-3xl bg-white dark:bg-card border-2 border-black dark:border-white shadow-xs flex flex-col justify-between space-y-4 hover:shadow-md transition-all">
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between">
-                      <span className="px-2.5 py-0.5 rounded-full bg-black text-white dark:bg-white dark:text-black text-[10px] font-extrabold uppercase tracking-wider">
-                        ★ Most Popular Challenge
-                      </span>
-                      <div className="text-right">
-                        <span className="text-lg font-extrabold text-foreground">$100,000</span>
-                        <p className="text-[10px] text-muted-foreground">Account Size</p>
+                    <div className="p-6 rounded-3xl bg-white dark:bg-card border border-zinc-200 dark:border-border shadow-xs flex flex-col justify-between space-y-4 hover:border-zinc-400 dark:hover:border-zinc-600 transition-all">
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between">
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 text-[10px] font-extrabold uppercase tracking-wider">
+                            Direct Cash Payout
+                          </span>
+                          <div className="text-right">
+                            <span className="text-lg font-extrabold text-foreground">$250.00</span>
+                            <p className="text-[10px] text-muted-foreground">USD Transfer</p>
+                          </div>
+                        </div>
+                        <div>
+                          <h4 className="text-base font-bold text-foreground">$250 Direct Cash Transfer</h4>
+                          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                            Fast direct settlement to your verified bank account or crypto wallet.
+                          </p>
+                        </div>
+                        <div className="pt-2 flex items-center justify-between text-xs font-semibold border-t border-zinc-100 dark:border-zinc-800">
+                          <span className="text-muted-foreground">Cost:</span>
+                          <span className="text-foreground font-mono font-bold">25,000 Points</span>
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenRewardRedeem({
+                          id: 'rew-cash-250',
+                          title: '$250 Direct Cash Transfer',
+                          category: 'cash',
+                          pointsCost: 25000,
+                          valueDisplay: '$250.00 USD',
+                          description: 'Bank Wire Transfer or USDT Crypto Payout',
+                          tag: 'Direct Cash',
+                        })}
+                        className={`w-full py-2.5 rounded-xl text-xs font-semibold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer ${
+                          isMilestoneUnlocked
+                            ? 'bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200'
+                            : 'border border-zinc-200 bg-zinc-100 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 hover:text-foreground'
+                        }`}
+                      >
+                        {isMilestoneUnlocked ? <Wallet className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                        <span>{isMilestoneUnlocked ? 'Redeem $250 Cash' : 'Redeem (100 Invites Req.)'}</span>
+                      </button>
                     </div>
-                    <div>
-                      <h4 className="text-base font-bold text-foreground">NYS Capital $100K 1-Step</h4>
-                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                        100% Free Account Voucher code delivered instantly for NYS Capital cTrader Evaluation.
-                      </p>
-                    </div>
-                    <div className="pt-2 flex items-center justify-between text-xs font-semibold border-t border-zinc-100 dark:border-zinc-800">
-                      <span className="text-muted-foreground">Cost:</span>
-                      <span className="text-foreground font-mono font-bold">15,000 Points</span>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenRewardRedeem({
-                      id: 'rew-chall-nys-100k',
-                      title: 'NYS Capital $100,000 1-Step Evaluation Account',
-                      category: 'challenge',
-                      pointsCost: 15000,
-                      valueDisplay: '$100,000 1-Step Key ($499 Value)',
-                      description: 'Instant Voucher Key for NYS Capital Evaluation',
-                      tag: 'Free Challenge',
-                    })}
-                    className={`w-full py-2.5 rounded-xl text-xs font-semibold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer ${
-                      isMilestoneUnlocked
-                        ? 'bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200'
-                        : 'border border-zinc-200 bg-zinc-100 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 hover:text-foreground'
-                    }`}
-                  >
-                    {isMilestoneUnlocked ? <Trophy className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-                    <span>{isMilestoneUnlocked ? 'Redeem Free $100K Challenge' : 'Redeem (100 Invites Req.)'}</span>
-                  </button>
-                </div>
 
-                {/* Reward 4: Topstep $50K Futures Combine */}
-                <div className="p-6 rounded-3xl bg-white dark:bg-card border border-zinc-200 dark:border-border shadow-xs flex flex-col justify-between space-y-4 hover:border-zinc-400 dark:hover:border-zinc-600 transition-all">
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between">
-                      <span className="px-2.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-foreground border border-zinc-200 dark:border-zinc-700 text-[10px] font-extrabold uppercase tracking-wider">
-                        CME Futures Challenge
-                      </span>
-                      <div className="text-right">
-                        <span className="text-lg font-extrabold text-foreground">$50,000</span>
-                        <p className="text-[10px] text-muted-foreground">Futures Account</p>
+                    <div className="p-6 rounded-3xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-col justify-between space-y-4 hover:border-zinc-400 dark:hover:border-zinc-600 transition-all">
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between">
+                          <span className="px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 text-[10px] font-extrabold uppercase tracking-wider">
+                            Commission Payout
+                          </span>
+                          <div className="text-right">
+                            <span className="text-lg font-extrabold text-foreground">${totalCommissionEarned.toFixed(2)}</span>
+                            <p className="text-[10px] text-muted-foreground">Available Balance</p>
+                          </div>
+                        </div>
+                        <div>
+                          <h4 className="text-base font-bold text-foreground">Withdraw Account Commission</h4>
+                          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                            Earn 20% on every challenge bought by your referrals. Withdraw your accrued earnings anytime.
+                          </p>
+                        </div>
+                        <div className="pt-2 flex items-center justify-between text-xs font-semibold border-t border-zinc-100 dark:border-zinc-800">
+                          <span className="text-muted-foreground">Commission Rate:</span>
+                          <span className="text-foreground font-mono font-bold">20% Lifetime</span>
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenRewardRedeem({
+                          id: 'rew-comm-payout',
+                          title: `Referral Commission Payout ($${totalCommissionEarned.toFixed(2)})`,
+                          category: 'commission',
+                          pointsCost: 0,
+                          valueDisplay: `$${totalCommissionEarned.toFixed(2)} USD`,
+                          description: 'Direct withdrawal of referral purchase commissions',
+                          tag: 'Commission',
+                        })}
+                        className={`w-full py-2.5 rounded-xl text-xs font-semibold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer ${
+                          isMilestoneUnlocked
+                            ? 'bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200'
+                            : 'border border-zinc-200 bg-zinc-100 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 hover:text-foreground'
+                        }`}
+                      >
+                        {isMilestoneUnlocked ? <DollarSign className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                        <span>{isMilestoneUnlocked ? `Withdraw $${totalCommissionEarned.toFixed(2)}` : 'Withdraw (100 Invites Req.)'}</span>
+                      </button>
                     </div>
-                    <div>
-                      <h4 className="text-base font-bold text-foreground">Topstep $50K Futures Combine</h4>
-                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                        Free evaluation key for Topstep Tradovate / NinjaTrader futures trading combine.
-                      </p>
-                    </div>
-                    <div className="pt-2 flex items-center justify-between text-xs font-semibold border-t border-zinc-100 dark:border-zinc-800">
-                      <span className="text-muted-foreground">Cost:</span>
-                      <span className="text-foreground font-mono font-bold">12,500 Points</span>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenRewardRedeem({
-                      id: 'rew-chall-topstep-50k',
-                      title: 'Topstep $50,000 CME Futures Combine Account',
-                      category: 'challenge',
-                      pointsCost: 12500,
-                      valueDisplay: '$50,000 Futures Key ($165 Value)',
-                      description: 'Instant Topstep Trading Combine Activation Code',
-                      tag: 'Free Challenge',
-                    })}
-                    className={`w-full py-2.5 rounded-xl text-xs font-semibold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer ${
-                      isMilestoneUnlocked
-                        ? 'bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200'
-                        : 'border border-zinc-200 bg-zinc-100 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 hover:text-foreground'
-                    }`}
-                  >
-                    {isMilestoneUnlocked ? <Trophy className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-                    <span>{isMilestoneUnlocked ? 'Redeem Topstep $50K' : 'Redeem (100 Invites Req.)'}</span>
-                  </button>
-                </div>
-
-                {/* Reward 5: FundedNext $50K Stellar */}
-                <div className="p-6 rounded-3xl bg-white dark:bg-card border border-zinc-200 dark:border-border shadow-xs flex flex-col justify-between space-y-4 hover:border-zinc-400 dark:hover:border-zinc-600 transition-all">
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between">
-                      <span className="px-2.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-foreground border border-zinc-200 dark:border-zinc-700 text-[10px] font-extrabold uppercase tracking-wider">
-                        2-Phase Challenge
-                      </span>
-                      <div className="text-right">
-                        <span className="text-lg font-extrabold text-foreground">$50,000</span>
-                        <p className="text-[10px] text-muted-foreground">Account Size</p>
-                      </div>
-                    </div>
-                    <div>
-                      <h4 className="text-base font-bold text-foreground">FundedNext $50K Stellar Challenge</h4>
-                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                        100% Free coupon code for FundedNext Stellar 2-Phase Challenge on Match-Trader.
-                      </p>
-                    </div>
-                    <div className="pt-2 flex items-center justify-between text-xs font-semibold border-t border-zinc-100 dark:border-zinc-800">
-                      <span className="text-muted-foreground">Cost:</span>
-                      <span className="text-foreground font-mono font-bold">10,000 Points</span>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenRewardRedeem({
-                      id: 'rew-chall-fn-50k',
-                      title: 'FundedNext $50,000 Stellar 2-Phase Challenge Account',
-                      category: 'challenge',
-                      pointsCost: 10000,
-                      valueDisplay: '$50,000 Stellar Key ($299 Value)',
-                      description: 'Instant Coupon Key for FundedNext Challenge',
-                      tag: 'Free Challenge',
-                    })}
-                    className={`w-full py-2.5 rounded-xl text-xs font-semibold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer ${
-                      isMilestoneUnlocked
-                        ? 'bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200'
-                        : 'border border-zinc-200 bg-zinc-100 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 hover:text-foreground'
-                    }`}
-                  >
-                    {isMilestoneUnlocked ? <Trophy className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-                    <span>{isMilestoneUnlocked ? 'Redeem FundedNext $50K' : 'Redeem (100 Invites Req.)'}</span>
-                  </button>
-                </div>
-
-                {/* Reward 6: Direct Affiliate Commission Payout */}
-                <div className="p-6 rounded-3xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-col justify-between space-y-4 hover:border-zinc-400 dark:hover:border-zinc-600 transition-all">
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between">
-                      <span className="px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 text-[10px] font-extrabold uppercase tracking-wider">
-                        Commission Payout
-                      </span>
-                      <div className="text-right">
-                        <span className="text-lg font-extrabold text-foreground">${totalCommissionEarned.toFixed(2)}</span>
-                        <p className="text-[10px] text-muted-foreground">Available Balance</p>
-                      </div>
-                    </div>
-                    <div>
-                      <h4 className="text-base font-bold text-foreground">Withdraw Account Commission</h4>
-                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                        Earn 20% on every challenge bought by your referrals. Withdraw your accrued earnings anytime.
-                      </p>
-                    </div>
-                    <div className="pt-2 flex items-center justify-between text-xs font-semibold border-t border-zinc-100 dark:border-zinc-800">
-                      <span className="text-muted-foreground">Commission Rate:</span>
-                      <span className="text-foreground font-mono font-bold">20% Lifetime</span>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenRewardRedeem({
-                      id: 'rew-comm-payout',
-                      title: `Referral Commission Payout ($${totalCommissionEarned.toFixed(2)})`,
-                      category: 'commission',
-                      pointsCost: 0,
-                      valueDisplay: `$${totalCommissionEarned.toFixed(2)} USD`,
-                      description: 'Direct withdrawal of referral purchase commissions',
-                      tag: 'Commission',
-                    })}
-                    className={`w-full py-2.5 rounded-xl text-xs font-semibold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer ${
-                      isMilestoneUnlocked
-                        ? 'bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200'
-                        : 'border border-zinc-200 bg-zinc-100 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 hover:text-foreground'
-                    }`}
-                  >
-                    {isMilestoneUnlocked ? <DollarSign className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-                    <span>{isMilestoneUnlocked ? `Withdraw $${totalCommissionEarned.toFixed(2)}` : 'Withdraw (100 Invites Req.)'}</span>
-                  </button>
-                </div>
-
-              </div>
+                  </>
+                )}
+              </div>             </div>
             </div>
 
             {/* 6. Referred Traders Activity Table */}

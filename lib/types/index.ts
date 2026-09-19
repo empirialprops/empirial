@@ -263,7 +263,8 @@ export interface LoyaltyReward {
   description: string;
   voucher_code?: string;
   is_available?: boolean;
-  category?: string;
+  category?: 'cash' | 'challenge' | 'commission' | string;
+  reward_value?: string;
 }
 
 export interface MarketTicker {

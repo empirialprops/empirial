@@ -127,6 +127,22 @@ export async function updateSiteSettings(data: any): Promise<void> {
   }, { merge: true });
 }
 
+export function subscribeToOfferPoster(callback: (posterConfig: any) => void): () => void {
+  if (!db) return () => {};
+  try {
+    const docRef = doc(db, 'siteSettings', 'main');
+    return onSnapshot(docRef, (snap) => {
+      if (snap.exists() && snap.data().offerPoster) {
+        callback(snap.data().offerPoster);
+      }
+    });
+  } catch (err) {
+    console.warn('Failed to subscribe to offer poster:', err);
+    return () => {};
+  }
+}
+
+
 // ==========================================
 // PROP FIRMS
 // ==========================================
@@ -1094,19 +1110,30 @@ export async function syncUserProfile(profile: UserProfile): Promise<void> {
  */
 export function subscribeLiveActiveTraders(onChange: (count: number) => void): () => void {
   if (!db) {
-    onChange(0);
+    onChange(50000);
     return () => {};
   }
-  const counterRef = doc(db, 'siteStats', 'counters');
-  const unsub = onSnapshot(counterRef, (snap) => {
-    if (snap.exists()) {
-      onChange(snap.data().active_traders ?? 0);
-    } else {
-      onChange(0);
+  const usersRef = collection(db, 'users');
+  const unsub = onSnapshot(usersRef, async (usersSnap) => {
+    try {
+      const usersCount = usersSnap.size;
+      const settingsDoc = await getDoc(doc(db, 'siteSettings', 'main'));
+      const settingsData = settingsDoc.exists() ? settingsDoc.data() : null;
+      let baseTraders = 50000;
+      if (settingsData?.stats?.[0]?.value) {
+        const val = settingsData.stats[0].value;
+        const suf = settingsData.stats[0].suffix || '';
+        baseTraders = suf.includes('K') ? val * 1000 : val;
+      }
+      const totalTraders = usersCount > 0 ? baseTraders + usersCount : baseTraders;
+      onChange(totalTraders);
+    } catch (err) {
+      console.warn('Failed to calculate live active traders count:', err);
+      onChange(usersSnap.size || 50000);
     }
   }, (err) => {
     console.error('Failed to subscribe to active traders count:', err);
-    onChange(0);
+    onChange(50000);
   });
   return unsub;
 }
@@ -1386,6 +1413,30 @@ export async function getAdminReferralStats() {
 // ==========================================
 // REAL-TIME SUPPORT TICKET MESSAGING SYSTEM
 // ==========================================
+
+export function subscribeToSingleSupportTicket(
+  ticketId: string,
+  callback: (ticket: any) => void
+): () => void {
+  if (!db || !ticketId) return () => {};
+  try {
+    const docRef = doc(db, 'supportTickets', ticketId);
+    return onSnapshot(
+      docRef,
+      (snap) => {
+        if (snap.exists()) {
+          callback({ id: snap.id, ...snap.data() });
+        }
+      },
+      (error) => {
+        console.warn('Real-time single ticket subscription error:', error);
+      }
+    );
+  } catch (err) {
+    console.warn('Failed to subscribe to single ticket:', err);
+    return () => {};
+  }
+}
 
 export function subscribeToUserSupportTickets(
   userId: string,
