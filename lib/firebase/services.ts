@@ -964,19 +964,18 @@ export async function getLivePlatformStats(): Promise<{
 }> {
   if (!db) {
     return {
-      activeTraders: 50000,
+      activeTraders: 0,
       verifiedFirms: 7,
       challenges: 42,
       reviews: 0,
     };
   }
   try {
-    const [usersSnap, firmsSnap, challsSnap, revsSnap, settingsDoc] = await Promise.all([
+    const [usersSnap, firmsSnap, challsSnap, revsSnap] = await Promise.all([
       getDocs(collection(db, 'users')),
       getDocs(collection(db, 'firms')),
       getDocs(collection(db, 'challenges')),
       getDocs(collection(db, 'reviews')),
-      getDoc(doc(db, 'siteSettings', 'main')),
     ]);
 
     const usersCount = usersSnap.size;
@@ -984,18 +983,8 @@ export async function getLivePlatformStats(): Promise<{
     const challsCount = challsSnap.size;
     const postedRevsCount = revsSnap.size;
 
-    const settingsData = settingsDoc.exists() ? settingsDoc.data() : null;
-    let baseTraders = 50000;
-    if (settingsData?.stats?.[0]?.value) {
-      const val = settingsData.stats[0].value;
-      const suf = settingsData.stats[0].suffix || '';
-      baseTraders = suf.includes('K') ? val * 1000 : val;
-    }
-
-    const totalTraders = usersCount > 0 ? baseTraders + usersCount : baseTraders;
-
     return {
-      activeTraders: totalTraders,
+      activeTraders: usersCount,
       verifiedFirms: firmsCount > 0 ? firmsCount : 7,
       challenges: challsCount > 0 ? challsCount : 42,
       reviews: postedRevsCount,
@@ -1003,7 +992,7 @@ export async function getLivePlatformStats(): Promise<{
   } catch (err) {
     console.error('Failed to get live platform stats:', err);
     return {
-      activeTraders: 50000,
+      activeTraders: 0,
       verifiedFirms: 7,
       challenges: 42,
       reviews: 0,
@@ -1025,11 +1014,10 @@ export function subscribeToLivePlatformStats(
       usersRef,
       async (usersSnap) => {
         try {
-          const [firmsSnap, challsSnap, revsSnap, settingsDoc] = await Promise.all([
+          const [firmsSnap, challsSnap, revsSnap] = await Promise.all([
             getDocs(firmsRef),
             getDocs(challsRef),
             getDocs(revsRef),
-            getDoc(doc(db, 'siteSettings', 'main')),
           ]);
 
           const usersCount = usersSnap.size;
@@ -1037,18 +1025,8 @@ export function subscribeToLivePlatformStats(
           const challsCount = challsSnap.size;
           const postedRevsCount = revsSnap.size;
 
-          const settingsData = settingsDoc.exists() ? settingsDoc.data() : null;
-          let baseTraders = 50000;
-          if (settingsData?.stats?.[0]?.value) {
-            const val = settingsData.stats[0].value;
-            const suf = settingsData.stats[0].suffix || '';
-            baseTraders = suf.includes('K') ? val * 1000 : val;
-          }
-
-          const totalTraders = usersCount > 0 ? baseTraders + usersCount : baseTraders;
-
           callback({
-            activeTraders: totalTraders,
+            activeTraders: usersCount,
             verifiedFirms: firmsCount > 0 ? firmsCount : 7,
             challenges: challsCount > 0 ? challsCount : 42,
             reviews: postedRevsCount,
@@ -1121,30 +1099,15 @@ export async function syncUserProfile(profile: UserProfile): Promise<void> {
  */
 export function subscribeLiveActiveTraders(onChange: (count: number) => void): () => void {
   if (!db) {
-    onChange(50000);
+    onChange(0);
     return () => {};
   }
   const usersRef = collection(db, 'users');
-  const unsub = onSnapshot(usersRef, async (usersSnap) => {
-    try {
-      const usersCount = usersSnap.size;
-      const settingsDoc = await getDoc(doc(db, 'siteSettings', 'main'));
-      const settingsData = settingsDoc.exists() ? settingsDoc.data() : null;
-      let baseTraders = 50000;
-      if (settingsData?.stats?.[0]?.value) {
-        const val = settingsData.stats[0].value;
-        const suf = settingsData.stats[0].suffix || '';
-        baseTraders = suf.includes('K') ? val * 1000 : val;
-      }
-      const totalTraders = usersCount > 0 ? baseTraders + usersCount : baseTraders;
-      onChange(totalTraders);
-    } catch (err) {
-      console.warn('Failed to calculate live active traders count:', err);
-      onChange(usersSnap.size || 50000);
-    }
+  const unsub = onSnapshot(usersRef, (usersSnap) => {
+    onChange(usersSnap.size);
   }, (err) => {
     console.error('Failed to subscribe to active traders count:', err);
-    onChange(50000);
+    onChange(0);
   });
   return unsub;
 }

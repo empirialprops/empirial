@@ -125,7 +125,7 @@ export async function seedDatabase() {
         cta2Url: 'https://discord.gg/ww4dkeeZdp',
       },
       stats: [
-        { value: 50000, suffix: 'K+', label: 'Active Traders' },
+        { value: 0, suffix: '+', label: 'Active Traders' },
         { value: 40, suffix: '+', label: 'Firms Audited' },
         { value: 12000, suffix: 'K+', label: 'Trader Reviews' },
         { value: 150, suffix: '+', label: 'Specs Compared' },

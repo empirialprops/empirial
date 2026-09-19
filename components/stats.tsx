@@ -6,7 +6,7 @@ import NumberFlow from "@number-flow/react";
 import { motion } from "framer-motion";
 
 const DEFAULT_STATS = [
-  { value: 50, suffix: "K+", label: "Active Traders" },
+  { value: 0, suffix: "+", label: "Active Traders" },
   { value: 7, suffix: "+", label: "Verified Firms" },
   { value: 42, suffix: "+", label: "Challenges" },
   { value: 150, suffix: "+", label: "Community Reviews" },
@@ -42,8 +42,14 @@ export default function Stats() {
           : rawReviews;
         const reviewsSuffix = rawReviews >= 1000 ? "K+" : "+";
 
+        const rawTraders = liveStats.activeTraders || 0;
+        const tradersVal = rawTraders >= 1000
+          ? Number((rawTraders / 1000).toFixed(rawTraders % 1000 === 0 ? 0 : 1))
+          : rawTraders;
+        const tradersSuffix = rawTraders >= 1000 ? "K+" : "+";
+
         setStats((prev) => [
-          prev[0], // Active Traders is handled by live subscription below
+          { value: tradersVal, suffix: tradersSuffix, label: "Active Traders" },
           { value: liveStats.verifiedFirms || 7, suffix: "+", label: "Verified Firms" },
           { value: liveStats.challenges || 42, suffix: "+", label: "Challenges" },
           { value: reviewsVal, suffix: reviewsSuffix, label: "Community Reviews" },
@@ -59,7 +65,7 @@ export default function Stats() {
   useEffect(() => {
     const unsub = subscribeLiveActiveTraders((liveCount) => {
       setStats((prev) => {
-        const count = liveCount > 0 ? liveCount : 50000;
+        const count = liveCount;
         const val = count >= 1000 ? Number((count / 1000).toFixed(count % 1000 === 0 ? 0 : 1)) : count;
         const suffix = count >= 1000 ? "K+" : "+";
         return [
