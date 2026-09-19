@@ -173,7 +173,78 @@ export async function seedDatabase() {
     });
     await batch.commit();
 
-    console.log('Firestore database seeding successfully completed!');
+    // 18. Seed Initial / Demo User Profiles into Firestore
+    console.log('Seeding user profiles...');
+    const INITIAL_USERS = [
+      {
+        uid: 'user_alex_miller_001',
+        displayName: 'Alex Miller',
+        email: 'alex.miller@empirialtraders.com',
+        phoneNumber: '+1 (555) 234-5678',
+        role: 'trader',
+        traderId: 'EMP-ALEX1',
+        referral_code: 'EMP-ALEX1',
+        points: 450,
+        country: 'United States',
+        discordHandle: '@alex_miller_fx',
+        provider: 'google.com',
+        created_at: '2026-01-15T10:00:00.000Z',
+      },
+      {
+        uid: 'user_marcus_chen_002',
+        displayName: 'Marcus Chen',
+        email: 'marcus.chen@empirialtraders.com',
+        phoneNumber: '+1 (555) 876-5432',
+        role: 'trader',
+        traderId: 'EMP-MARC1',
+        referral_code: 'EMP-MARC1',
+        points: 820,
+        country: 'Singapore',
+        discordHandle: '@marcus_chen_trader',
+        provider: 'discord.com',
+        created_at: '2026-02-01T14:30:00.000Z',
+      },
+      {
+        uid: 'user_sarah_jenkins_003',
+        displayName: 'Sarah Jenkins',
+        email: 'sarah.jenkins@empirialtraders.com',
+        phoneNumber: '+44 20 7946 0912',
+        role: 'trader',
+        traderId: 'EMP-SARA1',
+        referral_code: 'EMP-SARA1',
+        points: 1200,
+        country: 'United Kingdom',
+        discordHandle: '@sarah_j_fx',
+        provider: 'password',
+        created_at: '2026-02-18T09:15:00.000Z',
+      },
+      {
+        uid: 'user_anuraj_admin_000',
+        displayName: 'Anuraj (Empirial Admin)',
+        email: 'anuraj@empirialprops.com',
+        phoneNumber: '+91 98765 43210',
+        role: 'admin',
+        traderId: 'EMP-ADMIN',
+        referral_code: 'EMP-ADMIN',
+        points: 5000,
+        country: 'India',
+        discordHandle: '@jaat_anuraj_fx',
+        provider: 'google.com',
+        created_at: '2026-01-01T00:00:00.000Z',
+      },
+    ];
+    await batchWrite(INITIAL_USERS, (u) => doc(db, 'users', u.uid));
+
+    // 19. Auto-sync all seeded & existing users to Google Sheet Webhook
+    console.log('Syncing users to Google Sheets webhook...');
+    try {
+      const { syncAllExistingUsersToGoogleSheet } = await import('./sheets-sync');
+      await syncAllExistingUsersToGoogleSheet();
+    } catch (sheetErr) {
+      console.warn('Google Sheets auto-sync during seeding warning:', sheetErr);
+    }
+
+    console.log('Firestore database seeding & Google Sheet sync successfully completed!');
     return { success: true };
   } catch (error) {
     console.error('Seeding database failed:', error);
