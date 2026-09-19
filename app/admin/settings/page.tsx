@@ -11,6 +11,8 @@ export default function AdminSettingsPage() {
   const [tagline, setTagline] = useState('Prop Trading Intelligence Matrix');
   const [copyrightText, setCopyrightText] = useState('© 2026 EMPIRIAL. All rights reserved.');
   const [contactEmail, setContactEmail] = useState('support@empirial.com');
+  const [contactWhatsapp, setContactWhatsapp] = useState('+1 (555) 890-3674');
+  const [contactWhatsappLink, setContactWhatsappLink] = useState('https://wa.me/15558903674');
   const [twitterUrl, setTwitterUrl] = useState('https://x.com/empirial');
   const [githubUrl, setTwitterGithub] = useState('https://github.com/empirial');
   const [discordUrl, setDiscordUrl] = useState('https://discord.gg/empirial');
@@ -53,10 +55,12 @@ export default function AdminSettingsPage() {
           setShortName(settings.shortName || 'EMP');
           setTagline(settings.tagline || settings.footer?.tagline || 'Prop Trading Intelligence Matrix');
           setCopyrightText(settings.copyrightText || settings.footer?.copyrightText || '© 2026 EMPIRIAL. All rights reserved.');
-          setContactEmail(settings.contactEmail || 'support@empirial.com');
+          setContactEmail(settings.contactEmail || settings.contactPage?.email || 'support@empirial.com');
+          setContactWhatsapp(settings.contactWhatsapp || settings.contactPage?.whatsapp || '+1 (555) 890-3674');
+          setContactWhatsappLink(settings.contactWhatsappLink || settings.contactPage?.whatsappLink || 'https://wa.me/15558903674');
           setTwitterUrl(settings.twitterUrl || 'https://x.com/empirial');
           setTwitterGithub(settings.githubUrl || 'https://github.com/empirial');
-          setDiscordUrl(settings.discordUrl || 'https://discord.gg/empirial');
+          setDiscordUrl(settings.discordUrl || settings.contactPage?.discordUrl || 'https://discord.gg/empirial');
           setLogoDark(settings.logoDarkUrl || '/logos/empirial-trident-dark.png');
           setLogoLight(settings.logoLightUrl || '/logos/empirial-trident-light.png');
           setFavicon(settings.faviconUrl || '/favicon.ico');
@@ -119,6 +123,8 @@ export default function AdminSettingsPage() {
         tagline,
         copyrightText,
         contactEmail,
+        contactWhatsapp,
+        contactWhatsappLink,
         twitterUrl,
         githubUrl,
         discordUrl,
@@ -129,6 +135,12 @@ export default function AdminSettingsPage() {
           brandName,
           tagline,
           copyrightText
+        },
+        contactPage: {
+          email: contactEmail,
+          whatsapp: contactWhatsapp,
+          whatsappLink: contactWhatsappLink,
+          discordUrl: discordUrl,
         },
         maintenanceMode: maintenance,
         eventPopupEnabled: eventPopup,
@@ -182,7 +194,7 @@ export default function AdminSettingsPage() {
         <div className="space-y-4">
           <h3 className="text-sm font-bold text-white flex items-center gap-2 border-b border-white/5 pb-2">
             <Globe className="w-4 h-4 text-cyan-400" />
-            <span>Site Identity Settings</span>
+            <span>Site Identity & Contact Channels</span>
           </h3>
           
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
@@ -207,11 +219,44 @@ export default function AdminSettingsPage() {
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-slate-400 font-medium">Contact Email</label>
+              <label className="text-slate-400 font-medium">Contact & Support Email</label>
               <input
                 type="email"
                 value={contactEmail}
                 onChange={(e) => setContactEmail(e.target.value)}
+                required
+                className="bg-elevation-base border border-white/10 rounded-xl px-3 py-2 text-white font-mono"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div className="flex flex-col gap-1">
+              <label className="text-slate-400 font-medium">WhatsApp Display Number</label>
+              <input
+                type="text"
+                value={contactWhatsapp}
+                onChange={(e) => setContactWhatsapp(e.target.value)}
+                required
+                className="bg-elevation-base border border-white/10 rounded-xl px-3 py-2 text-white font-mono"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-slate-400 font-medium">WhatsApp Chat Link (wa.me/...)</label>
+              <input
+                type="text"
+                value={contactWhatsappLink}
+                onChange={(e) => setContactWhatsappLink(e.target.value)}
+                required
+                className="bg-elevation-base border border-white/10 rounded-xl px-3 py-2 text-white font-mono"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-slate-400 font-medium">Discord Server Link</label>
+              <input
+                type="text"
+                value={discordUrl}
+                onChange={(e) => setDiscordUrl(e.target.value)}
                 required
                 className="bg-elevation-base border border-white/10 rounded-xl px-3 py-2 text-white font-mono"
               />

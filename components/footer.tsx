@@ -68,7 +68,7 @@ const Footer = () => {
     },
     {
       name: "Discord",
-      href: settings?.discordUrl || "https://discord.gg/ww4dkeeZdp",
+      href: settings?.discordUrl || settings?.contactPage?.discordUrl || "https://discord.gg/ww4dkeeZdp",
       icon: DiscordIcon,
     },
     {

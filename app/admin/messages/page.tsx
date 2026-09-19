@@ -1,35 +1,53 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Mail, Trash2, CheckCircle2, Send, MessageSquare, Ticket, AlertCircle, Clock, ShieldCheck, User } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Mail, Trash2, CheckCircle2, Send, MessageSquare, Ticket, AlertCircle, Clock, ShieldCheck, User, Radio } from 'lucide-react';
 import {
   UserSupportTicket,
   getStoredSupportTickets,
   saveSupportTickets,
   replyToSupportTicket,
 } from '@/lib/utils/auth-store';
+import {
+  subscribeToAllSupportTickets,
+  updateSupportTicketStatusInFirestore,
+  deleteSupportTicketFromFirestore,
+} from '@/lib/firebase/services';
 
 export default function AdminMessagesPage() {
   const [tickets, setTickets] = useState<UserSupportTicket[]>([]);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'open' | 'in_progress' | 'resolved'>('all');
+  const chatBottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setTickets(getStoredSupportTickets());
+
+    // Real-time Firestore subscription across all browsers/devices
+    const unsubscribe = subscribeToAllSupportTickets((remoteTickets) => {
+      if (remoteTickets && remoteTickets.length > 0) {
+        setTickets(remoteTickets);
+        saveSupportTickets(remoteTickets);
+      }
+    });
 
     const handleTicketsChange = (e: CustomEvent) => {
       if (e.detail) setTickets(e.detail);
     };
 
     window.addEventListener('support-tickets-changed' as any, handleTicketsChange);
-    return () => window.removeEventListener('support-tickets-changed' as any, handleTicketsChange);
+    return () => {
+      unsubscribe();
+      window.removeEventListener('support-tickets-changed' as any, handleTicketsChange);
+    };
   }, []);
 
   const handleDelete = (id: string) => {
     const updated = tickets.filter((t) => t.id !== id);
     setTickets(updated);
     saveSupportTickets(updated);
+    deleteSupportTicketFromFirestore(id);
     if (selectedTicketId === id) setSelectedTicketId(null);
   };
 
@@ -40,6 +58,7 @@ export default function AdminMessagesPage() {
     });
     setTickets(updated);
     saveSupportTickets(updated);
+    updateSupportTicketStatusInFirestore(id, newStatus);
   };
 
   const handleSendReply = (ticketId: string) => {
@@ -55,6 +74,12 @@ export default function AdminMessagesPage() {
   });
 
   const activeTicket = tickets.find((t) => t.id === selectedTicketId) || filteredTickets[0];
+
+  useEffect(() => {
+    if (chatBottomRef.current) {
+      chatBottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [activeTicket?.messages?.length, activeTicket?.id]);
 
   return (
     <div className="space-y-6">
@@ -234,6 +259,7 @@ export default function AdminMessagesPage() {
                     </div>
                   );
                 })}
+                <div ref={chatBottomRef} />
               </div>
 
               {/* Admin Reply Composer */}

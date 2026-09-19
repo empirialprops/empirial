@@ -61,6 +61,7 @@ import {
   addUserReview,
   UserSupportTicket,
   getStoredSupportTickets,
+  saveSupportTickets,
   addSupportTicket,
   replyToSupportTicket,
   DEFAULT_PURCHASED_ACCOUNTS,
@@ -76,7 +77,7 @@ import { MOCK_EVENTS } from '@/lib/data/events-data';
 import { MOCK_FIRMS } from '@/lib/data/firms-data';
 import { db } from '@/lib/firebase/config';
 import { doc, setDoc } from 'firebase/firestore';
-import { getReferralStats } from '@/lib/firebase/services';
+import { getReferralStats, subscribeToUserSupportTickets } from '@/lib/firebase/services';
 
 export function ProfileClient() {
   const [currentUser, setCurrentUser] = useState<UserProfile>(DEMO_TRADER);
@@ -165,8 +166,14 @@ export function ProfileClient() {
     const user = getStoredUser() || DEMO_TRADER;
     setCurrentUser(user);
     setEditName(user.displayName);
-    // Clean legacy demo testing data from localStorage if present
+    // Check URL search parameters for tab selection (e.g. /profile?tab=support)
     if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabParam = urlParams.get('tab');
+      if (tabParam && ['dashboard', 'reviews', 'events', 'support', 'referrals'].includes(tabParam)) {
+        setActiveTab(tabParam as any);
+      }
+
       const savedRefs = localStorage.getItem('empirial_user_referrals');
       if (savedRefs && (savedRefs.includes('Marcus Chen') || savedRefs.includes('Sarah Jenkins'))) {
         localStorage.removeItem('empirial_user_referrals');
@@ -216,6 +223,28 @@ export function ProfileClient() {
       window.removeEventListener('redeemed-rewards-changed' as any, handleRedeemedRewardsChange);
     };
   }, []);
+
+  const traderChatBottomRef = React.useRef<HTMLDivElement>(null);
+
+  // Real-time Firestore support ticket subscription for trader
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    const unsubscribe = subscribeToUserSupportTickets(currentUser.uid, (remoteTickets) => {
+      if (remoteTickets && remoteTickets.length > 0) {
+        setTicketsList(remoteTickets);
+        saveSupportTickets(remoteTickets);
+      }
+    });
+    return () => unsubscribe();
+  }, [currentUser?.uid]);
+
+  // Auto-scroll trader ticket chat thread to bottom on message updates
+  const activeSelectedTicket = ticketsList.find((t) => t.id === selectedTicketId) || ticketsList[0];
+  useEffect(() => {
+    if (traderChatBottomRef.current) {
+      traderChatBottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [activeSelectedTicket?.messages?.length, activeSelectedTicket?.id]);
 
   // Save Profile Handler
   const handleSaveProfile = (e: React.FormEvent) => {
@@ -784,11 +813,18 @@ export function ProfileClient() {
                       type="tel"
                       value={editPhone}
                       onChange={(e) => setEditPhone(e.target.value)}
+                      placeholder="Enter contact number (WhatsApp / Phone)..."
                       className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground font-semibold focus:outline-none focus:border-black dark:focus:border-white"
                     />
                   ) : (
                     <div className="p-3 rounded-xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/80 font-bold text-foreground">
-                      {currentUser.phoneNumber || '+1 (555) 389-2049'}
+                      {currentUser.phoneNumber && currentUser.phoneNumber.trim() ? (
+                        currentUser.phoneNumber
+                      ) : (
+                        <span className="text-muted-foreground font-normal text-xs italic">
+                          Not provided (click Edit Profile to add)
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1437,6 +1473,7 @@ export function ProfileClient() {
                           </div>
                         );
                       })}
+                      <div ref={traderChatBottomRef} />
                     </div>
 
                     {/* Reply Input Box */}

@@ -18,6 +18,7 @@ import {
   writeBatch,
   runTransaction,
   onSnapshot,
+  arrayUnion,
   DocumentData
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
@@ -946,18 +947,19 @@ export async function getLivePlatformStats(): Promise<{
 }> {
   if (!db) {
     return {
-      activeTraders: 10,
+      activeTraders: 50000,
       verifiedFirms: 7,
       challenges: 42,
       reviews: 0,
     };
   }
   try {
-    const [usersSnap, firmsSnap, challsSnap, revsSnap] = await Promise.all([
+    const [usersSnap, firmsSnap, challsSnap, revsSnap, settingsDoc] = await Promise.all([
       getDocs(collection(db, 'users')),
       getDocs(collection(db, 'firms')),
       getDocs(collection(db, 'challenges')),
       getDocs(collection(db, 'reviews')),
+      getDoc(doc(db, 'siteSettings', 'main')),
     ]);
 
     const usersCount = usersSnap.size;
@@ -965,8 +967,18 @@ export async function getLivePlatformStats(): Promise<{
     const challsCount = challsSnap.size;
     const postedRevsCount = revsSnap.size;
 
+    const settingsData = settingsDoc.exists() ? settingsDoc.data() : null;
+    let baseTraders = 50000;
+    if (settingsData?.stats?.[0]?.value) {
+      const val = settingsData.stats[0].value;
+      const suf = settingsData.stats[0].suffix || '';
+      baseTraders = suf.includes('K') ? val * 1000 : val;
+    }
+
+    const totalTraders = usersCount > 0 ? baseTraders + usersCount : baseTraders;
+
     return {
-      activeTraders: usersCount > 0 ? usersCount : 10,
+      activeTraders: totalTraders,
       verifiedFirms: firmsCount > 0 ? firmsCount : 7,
       challenges: challsCount > 0 ? challsCount : 42,
       reviews: postedRevsCount,
@@ -974,11 +986,67 @@ export async function getLivePlatformStats(): Promise<{
   } catch (err) {
     console.error('Failed to get live platform stats:', err);
     return {
-      activeTraders: 10,
+      activeTraders: 50000,
       verifiedFirms: 7,
       challenges: 42,
       reviews: 0,
     };
+  }
+}
+
+export function subscribeToLivePlatformStats(
+  callback: (stats: { activeTraders: number; verifiedFirms: number; challenges: number; reviews: number }) => void
+): () => void {
+  if (!db) return () => {};
+  try {
+    const usersRef = collection(db, 'users');
+    const firmsRef = collection(db, 'firms');
+    const challsRef = collection(db, 'challenges');
+    const revsRef = collection(db, 'reviews');
+
+    return onSnapshot(
+      usersRef,
+      async (usersSnap) => {
+        try {
+          const [firmsSnap, challsSnap, revsSnap, settingsDoc] = await Promise.all([
+            getDocs(firmsRef),
+            getDocs(challsRef),
+            getDocs(revsRef),
+            getDoc(doc(db, 'siteSettings', 'main')),
+          ]);
+
+          const usersCount = usersSnap.size;
+          const firmsCount = firmsSnap.size;
+          const challsCount = challsSnap.size;
+          const postedRevsCount = revsSnap.size;
+
+          const settingsData = settingsDoc.exists() ? settingsDoc.data() : null;
+          let baseTraders = 50000;
+          if (settingsData?.stats?.[0]?.value) {
+            const val = settingsData.stats[0].value;
+            const suf = settingsData.stats[0].suffix || '';
+            baseTraders = suf.includes('K') ? val * 1000 : val;
+          }
+
+          const totalTraders = usersCount > 0 ? baseTraders + usersCount : baseTraders;
+
+          callback({
+            activeTraders: totalTraders,
+            verifiedFirms: firmsCount > 0 ? firmsCount : 7,
+            challenges: challsCount > 0 ? challsCount : 42,
+            reviews: postedRevsCount,
+          });
+        } catch (err) {
+          console.warn('Error fetching live stats on snapshot:', err);
+        }
+      },
+      (err) => {
+        console.warn('Live platform stats subscription error:', err);
+      }
+    );
+  } catch (err) {
+    console.warn('Failed to subscribe to live platform stats:', err);
+    return () => {};
   }
 }
 
@@ -1312,5 +1380,131 @@ export async function getAdminReferralStats() {
   } catch (err) {
     console.error('Error fetching admin referral stats:', err);
     return { totalVisitors: 0, totalRegistrations: 0, activeReferrers: 0, conversionRate: 0, referrers: [], leads: [] };
+  }
+}
+
+// ==========================================
+// REAL-TIME SUPPORT TICKET MESSAGING SYSTEM
+// ==========================================
+
+export function subscribeToUserSupportTickets(
+  userId: string,
+  callback: (tickets: any[]) => void
+): () => void {
+  if (!db) return () => {};
+  try {
+    const colRef = collection(db, 'supportTickets');
+    const q = query(colRef, where('user_id', '==', userId));
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const tickets = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        tickets.sort(
+          (a: any, b: any) =>
+            new Date(b.updated_at || b.created_at || 0).getTime() -
+            new Date(a.updated_at || a.created_at || 0).getTime()
+        );
+        callback(tickets);
+      },
+      (error) => {
+        console.warn('Real-time user support tickets subscription error:', error);
+      }
+    );
+  } catch (err) {
+    console.warn('Failed to subscribe to user support tickets:', err);
+    return () => {};
+  }
+}
+
+export function subscribeToAllSupportTickets(
+  callback: (tickets: any[]) => void
+): () => void {
+  if (!db) return () => {};
+  try {
+    const colRef = collection(db, 'supportTickets');
+    return onSnapshot(
+      colRef,
+      (snapshot) => {
+        const tickets = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        tickets.sort(
+          (a: any, b: any) =>
+            new Date(b.updated_at || b.created_at || 0).getTime() -
+            new Date(a.updated_at || a.created_at || 0).getTime()
+        );
+        callback(tickets);
+      },
+      (error) => {
+        console.warn('Real-time admin support tickets subscription error:', error);
+      }
+    );
+  } catch (err) {
+    console.warn('Failed to subscribe to all support tickets:', err);
+    return () => {};
+  }
+}
+
+export async function createSupportTicketInFirestore(ticket: any): Promise<void> {
+  if (!db) return;
+  try {
+    const docRef = doc(db, 'supportTickets', ticket.id);
+    await setDoc(docRef, {
+      ...ticket,
+      updated_at: new Date().toISOString(),
+    }, { merge: true });
+  } catch (err) {
+    console.warn('Failed to save support ticket to Firestore:', err);
+  }
+}
+
+export async function sendTicketReplyInFirestore(
+  ticketId: string,
+  newMessage: any,
+  newStatus?: string
+): Promise<void> {
+  if (!db) return;
+  try {
+    const docRef = doc(db, 'supportTickets', ticketId);
+    const updateData: any = {
+      messages: arrayUnion(newMessage),
+      updated_at: new Date().toISOString(),
+    };
+    if (newStatus) {
+      updateData.status = newStatus;
+    }
+    await updateDoc(docRef, updateData);
+  } catch (err) {
+    console.warn('Failed to send ticket reply in Firestore:', err);
+  }
+}
+
+export async function updateSupportTicketStatusInFirestore(
+  ticketId: string,
+  newStatus: string
+): Promise<void> {
+  if (!db) return;
+  try {
+    const docRef = doc(db, 'supportTickets', ticketId);
+    await updateDoc(docRef, {
+      status: newStatus,
+      updated_at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.warn('Failed to update support ticket status in Firestore:', err);
+  }
+}
+
+export async function deleteSupportTicketFromFirestore(ticketId: string): Promise<void> {
+  if (!db) return;
+  try {
+    const docRef = doc(db, 'supportTickets', ticketId);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.warn('Failed to delete support ticket from Firestore:', err);
   }
 }

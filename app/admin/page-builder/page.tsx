@@ -444,6 +444,10 @@ export default function AdminPageBuilderPage() {
     try {
       invalidateSiteSettingsCache();
       await updateSiteSettings({
+        contactEmail: contactEmail,
+        contactWhatsapp: contactWhatsapp,
+        contactWhatsappLink: contactWhatsappLink,
+        discordUrl: contactDiscordUrl,
         contactPage: {
           title: contactTitle,
           subtitle: contactSubtitle,

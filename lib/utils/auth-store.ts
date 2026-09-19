@@ -269,6 +269,11 @@ export function addSupportTicket(ticket: Omit<UserSupportTicket, 'id' | 'created
   };
   const updated = [newTicket, ...tickets];
   saveSupportTickets(updated);
+
+  import('@/lib/firebase/services').then(({ createSupportTicketInFirestore }) => {
+    createSupportTicketInFirestore(newTicket);
+  }).catch(err => console.warn('Silent Firestore ticket save error:', err));
+
   return newTicket;
 }
 
@@ -294,6 +299,11 @@ export function replyToSupportTicket(ticketId: string, text: string, sender: 'us
 
   tickets[ticketIndex] = ticket;
   saveSupportTickets(tickets);
+
+  import('@/lib/firebase/services').then(({ sendTicketReplyInFirestore }) => {
+    sendTicketReplyInFirestore(ticketId, newMsg, (sender === 'support' || sender === 'admin') ? 'in_progress' : undefined);
+  }).catch(err => console.warn('Silent Firestore ticket reply error:', err));
+
   return ticket;
 }
 

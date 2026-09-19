@@ -59,7 +59,7 @@ export function ReferralTracker() {
           uid: mockUid,
           displayName: mockUsername,
           email: mockEmail,
-          phoneNumber: '+1 (555) 812-9901',
+          phoneNumber: '',
           role: 'trader',
           traderId: `EMP-${mockUid.substring(8, 13).toUpperCase()}`,
           referral_code: `EMP-${mockUid.substring(8, 13).toUpperCase()}`,

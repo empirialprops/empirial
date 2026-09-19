@@ -47,7 +47,7 @@ export function LoginModal() {
       uid: 'user-' + Date.now(),
       email: email,
       displayName: email.split('@')[0],
-      phoneNumber: '+1 (555) 000-0000',
+      phoneNumber: '',
       role: email.includes('admin') ? 'admin' : 'trader',
       traderId: 'EMP-' + Math.floor(10000 + Math.random() * 90000),
       points: 500,

@@ -1,6 +1,5 @@
-'use client';
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getSiteSettings } from '@/lib/firebase/services';
 import {
   TrendingUp,
   Users,
@@ -17,6 +16,7 @@ import {
 } from 'lucide-react';
 
 export function BentoDashboard() {
+  const [supportEmail, setSupportEmail] = useState('support@empirial.com');
   // Interactive state for Daily Pip Target
   const [pipGoal, setPipGoal] = useState(350);
   const [chatMessage, setChatMessage] = useState('');
@@ -25,6 +25,21 @@ export function BentoDashboard() {
     { sender: 'Trader', role: 'You', text: 'Hey, I just passed Phase 2 on Funding Pips! When is my first 5-day cycle?' },
     { sender: 'Sofia Davis', role: 'Support Lead', text: 'Congratulations! Your contract is approved and your 5-day cycle started today.' },
   ]);
+
+  useEffect(() => {
+    async function loadEmail() {
+      try {
+        const settings = await getSiteSettings();
+        if (settings) {
+          const email = settings.contactEmail || settings.contactPage?.email || 'support@empirial.com';
+          setSupportEmail(email);
+        }
+      } catch (err) {
+        console.error('Failed to load settings in BentoDashboard:', err);
+      }
+    }
+    loadEmail();
+  }, []);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -248,7 +263,7 @@ export function BentoDashboard() {
                 </div>
                 <div>
                   <span className="text-xs font-bold text-white">Sofia Davis</span>
-                  <p className="text-[10px] text-slate-400">support@empirial.com</p>
+                  <p className="text-[10px] text-slate-400">{supportEmail}</p>
                 </div>
               </div>
               <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-500/20">
