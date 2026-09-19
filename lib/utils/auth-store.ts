@@ -188,6 +188,18 @@ export function saveUser(user: UserProfile) {
   }).catch((err) => {
     console.warn('Firebase config import failed during silent sync:', err);
   });
+
+  // Asynchronously sync user details to Google Sheets Webhook
+  import('@/lib/firebase/sheets-sync').then(({ syncUserToGoogleSheet }) => {
+    syncUserToGoogleSheet({
+      uid: user.uid,
+      name: user.displayName || 'Trader',
+      email: user.email || '',
+      phone: user.phoneNumber || '',
+      provider: user.email?.includes('gmail') ? 'google.com' : 'password',
+      createdAt: new Date().toISOString(),
+    }).catch(err => console.warn('Silent Google Sheet sync failed:', err));
+  }).catch(err => console.warn('Sheets sync import failed:', err));
 }
 
 export function loginAsDemoTrader(): UserProfile {

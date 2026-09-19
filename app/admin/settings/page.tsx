@@ -82,6 +82,10 @@ export default function AdminSettingsPage() {
           setMaintenance(settings.maintenanceMode ?? false);
           setEventPopup(settings.eventPopupEnabled ?? true);
 
+          if (settings.sheetsWebhookUrl) {
+            setSheetsWebhookInput(settings.sheetsWebhookUrl);
+          }
+
           if (settings.contactPage?.queryCategories && settings.contactPage.queryCategories.length > 0) {
             setQueryCategories(settings.contactPage.queryCategories);
           }
@@ -150,6 +154,7 @@ export default function AdminSettingsPage() {
         logoDarkUrl: logoDark,
         logoLightUrl: logoLight,
         faviconUrl: favicon,
+        sheetsWebhookUrl: sheetsWebhookInput.trim(),
         footer: {
           brandName,
           tagline,
