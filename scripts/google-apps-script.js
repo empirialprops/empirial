@@ -1,21 +1,16 @@
 /**
  * =======================================================================================
- * GOOGLE APPS SCRIPT: FIREBASE AUTH TO GOOGLE SHEETS RECEIVER WEBHOOK
+ * GOOGLE APPS SCRIPT: COMPLETE FIREBASE AUTH & USER PROFILE RECEIVER WEBHOOK
  * =======================================================================================
  * Target Spreadsheet ID: 1vc2xSb3i8RR1Pec0h6poBiwwa68VhN9aiJ7J8bShCNA
  * Spreadsheet URL: https://docs.google.com/spreadsheets/d/1vc2xSb3i8RR1Pec0h6poBiwwa68VhN9aiJ7J8bShCNA/edit
  *
- * HOW TO INSTALL:
+ * HOW TO INSTALL / UPDATE:
  * 1. Open your Google Sheet: https://docs.google.com/spreadsheets/d/1vc2xSb3i8RR1Pec0h6poBiwwa68VhN9aiJ7J8bShCNA/edit
- * 2. Click on "Extensions" in the top menu -> "Apps Script".
- * 3. Delete any default code in Code.gs and paste this entire file.
- * 4. Click "Deploy" (top right) -> "New deployment".
- * 5. Select type "Web app":
- *    - Description: "Firebase Auth Sync Receiver"
- *    - Execute as: "Me (your_email@gmail.com)"
- *    - Who has access: "Anyone"
- * 6. Click "Deploy", authorize permissions when prompted, and copy the "Web app URL".
- * 7. Set this URL in your Next.js `.env.local` as `GOOGLE_SHEETS_WEBHOOK_URL` or in the Admin Settings.
+ * 2. Click "Extensions" -> "Apps Script".
+ * 3. Replace all code in Code.gs with this entire file.
+ * 4. Click "Deploy" (top right) -> "Manage deployments" -> Edit -> "New version" -> Deploy.
+ *    (OR "Deploy" -> "New deployment" -> Web app -> Anyone -> Deploy).
  * =======================================================================================
  */
 
@@ -23,14 +18,20 @@
 const SPREADSHEET_ID = "1vc2xSb3i8RR1Pec0h6poBiwwa68VhN9aiJ7J8bShCNA";
 const SHEET_TAB_NAME = "Users"; // Tab name inside the spreadsheet
 
-// Expected Columns in Order:
+// Comprehensive Auth & Profile Headers
 const HEADERS = [
   "User ID (UID)",
   "Full Name",
   "Email Address",
+  "Email Verified",
   "Phone Number",
   "Auth Provider",
+  "Role",
+  "Loyalty Points",
+  "Account Status",
   "Created At",
+  "Last Sign-In At",
+  "Avatar / Photo URL",
   "Last Synced At"
 ];
 
@@ -46,7 +47,7 @@ function doPost(e) {
   } catch (lockError) {
     return createJsonResponse({
       status: "error",
-      message: "Server is busy processing concurrent signups. Please try again."
+      message: "Server is busy processing concurrent requests. Please try again."
     }, 429);
   }
 
@@ -81,6 +82,13 @@ function doPost(e) {
     } else if (sheet.getLastRow() === 0) {
       sheet.appendRow(HEADERS);
       formatHeaderRow(sheet);
+    } else {
+      // Ensure header row is up-to-date with 13 columns
+      const currentHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+      if (currentHeaders.length < HEADERS.length) {
+        sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+        formatHeaderRow(sheet);
+      }
     }
 
     // Check if payload is a batch array or single user
@@ -106,38 +114,54 @@ function doPost(e) {
       const uid = String(user.uid || "").trim();
       const name = String(user.name || user.displayName || "Anonymous Trader").trim();
       const email = String(user.email || "").trim().toLowerCase();
+      const emailVerified = user.emailVerified === true ? "TRUE" : "FALSE";
       const phone = String(user.phone || user.phoneNumber || "N/A").trim();
       const provider = String(user.provider || "password").trim();
-      const createdAt = String(user.createdAt || nowIso).trim();
+      const role = String(user.role || (email.includes("admin") ? "admin" : "trader")).trim();
+      const points = Number(user.points || user.loyaltyPoints || 500);
+      const status = user.disabled ? "Disabled" : "Active";
+      const createdAt = String(user.createdAt || user.created_at || nowIso).trim();
+      const lastSignInAt = String(user.lastSignInAt || user.lastLogin || nowIso).trim();
+      const photoURL = String(user.photoURL || user.avatar || "N/A").trim();
 
       if (!uid && !email) return;
+
+      const rowValues = [
+        uid,
+        name,
+        email,
+        emailVerified,
+        phone,
+        provider,
+        role,
+        points,
+        status,
+        createdAt,
+        lastSignInAt,
+        photoURL,
+        nowIso
+      ];
 
       // Check if user already exists
       const targetRow = uidRowMap.get(uid) || (email ? emailRowMap.get(email) : null);
 
       if (targetRow) {
-        // Update existing row
-        sheet.getRange(targetRow, 1, 1, 7).setValues([[
-          uid,
-          name,
-          email,
-          phone !== "N/A" ? phone : sheet.getRange(targetRow, 4).getValue() || "N/A",
-          provider,
-          sheet.getRange(targetRow, 6).getValue() || createdAt,
-          nowIso
-        ]]);
+        // Preserve phone if already set in sheet and not provided
+        const existingPhone = sheet.getRange(targetRow, 5).getValue();
+        if ((phone === "N/A" || !phone) && existingPhone && existingPhone !== "N/A") {
+          rowValues[4] = existingPhone;
+        }
+        // Preserve createdAt if already in sheet
+        const existingCreatedAt = sheet.getRange(targetRow, 10).getValue();
+        if (existingCreatedAt) {
+          rowValues[9] = existingCreatedAt;
+        }
+
+        sheet.getRange(targetRow, 1, 1, HEADERS.length).setValues([rowValues]);
         updatedCount++;
       } else {
         // Append brand new row
-        sheet.appendRow([
-          uid,
-          name,
-          email,
-          phone,
-          provider,
-          createdAt,
-          nowIso
-        ]);
+        sheet.appendRow(rowValues);
         const newRowIdx = sheet.getLastRow();
         if (uid) uidRowMap.set(uid, newRowIdx);
         if (email) emailRowMap.set(email, newRowIdx);
@@ -150,6 +174,7 @@ function doPost(e) {
       inserted: insertedCount,
       updated: updatedCount,
       totalProcessed: usersToProcess.length,
+      headers: HEADERS,
       timestamp: nowIso
     });
 
@@ -169,9 +194,10 @@ function doPost(e) {
 function doGet(e) {
   return createJsonResponse({
     status: "online",
-    message: "Firebase to Google Sheets Webhook is active and operational.",
+    message: "Firebase All Auth Data to Google Sheets Webhook is active and operational.",
     targetSpreadsheetId: SPREADSHEET_ID,
     targetTab: SHEET_TAB_NAME,
+    headers: HEADERS,
     timestamp: new Date().toISOString()
   });
 }
@@ -181,7 +207,7 @@ function doGet(e) {
  */
 function formatHeaderRow(sheet) {
   const headerRange = sheet.getRange(1, 1, 1, HEADERS.length);
-  headerRange.setBackground("#0F4C2C"); // Dark Green / Emerald
+  headerRange.setBackground("#064E3B"); // Emerald 900
   headerRange.setFontColor("#FFFFFF");
   headerRange.setFontWeight("bold");
   headerRange.setFontFamily("Plus Jakarta Sans");

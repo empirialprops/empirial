@@ -4,9 +4,15 @@ export interface SyncUserRequest {
   uid: string;
   name: string;
   email: string;
+  emailVerified?: boolean;
   phone?: string;
   provider: 'google.com' | 'discord.com' | 'password' | string;
+  role?: string;
+  points?: number;
+  disabled?: boolean;
   createdAt?: string;
+  lastSignInAt?: string;
+  photoURL?: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -37,9 +43,15 @@ export async function POST(req: NextRequest) {
       uid: body.uid,
       name: body.name || 'Trader',
       email: body.email,
+      emailVerified: body.emailVerified ?? false,
       phone: body.phone || 'N/A',
       provider: body.provider || 'password',
+      role: body.role || (body.email.includes('admin') ? 'admin' : 'trader'),
+      points: body.points || 500,
+      disabled: body.disabled ?? false,
       createdAt: body.createdAt || new Date().toISOString(),
+      lastSignInAt: body.lastSignInAt || new Date().toISOString(),
+      photoURL: body.photoURL || 'N/A',
     };
 
     // Forward to Google Apps Script Webhook

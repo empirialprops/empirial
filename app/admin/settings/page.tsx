@@ -185,13 +185,18 @@ export default function AdminSettingsPage() {
 
   const handleSyncExistingUsersToSheet = async () => {
     const targetUrl = sheetsWebhookInput.trim() || DEFAULT_SHEETS_WEBHOOK_URL;
-    if (!targetUrl) {
-      alert('Please enter your Google Apps Script Webhook URL first.');
-      return;
-    }
     setSheetsSyncing(true);
     setSheetsSyncMsg('');
     try {
+      // 1. Try server-side complete sync route
+      const apiRes = await fetch('/api/admin/sync-all', { method: 'POST' });
+      if (apiRes.ok) {
+        const json = await apiRes.json();
+        setSheetsSyncMsg(`Successfully synchronized ${json.count || 'all'} user(s) & complete auth records to Google Sheet!`);
+        return;
+      }
+
+      // 2. Client SDK fallback
       const res = await syncAllExistingUsersToGoogleSheet(targetUrl);
       if (res.success) {
         setSheetsSyncMsg(`Successfully exported ${res.count} existing user(s) to Google Sheet!`);
