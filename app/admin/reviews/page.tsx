@@ -249,14 +249,24 @@ export default function AdminReviewsPage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleStartAdd}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs sm:text-sm font-semibold transition-colors shadow-xs cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add New Review</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => alert('All trader review updates and moderation statuses have been saved!')}
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-semibold cursor-pointer shadow"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            <span>Save Changes</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleStartAdd}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-foreground text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Review</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}

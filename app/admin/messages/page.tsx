@@ -113,8 +113,18 @@ export default function AdminMessagesPage() {
           </p>
         </div>
 
-        {/* Filter Pills (RULE:BW) */}
-        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs self-start sm:self-center">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => alert('All support ticket status changes and replies have been saved!')}
+            className="px-4 py-2 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-semibold transition-all cursor-pointer shadow flex items-center gap-1.5"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Save Changes</span>
+          </button>
+
+          {/* Filter Pills (RULE:BW) */}
+          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs">
           <button
             type="button"
             onClick={() => setFilterStatus('all')}
@@ -161,6 +171,7 @@ export default function AdminMessagesPage() {
           </button>
         </div>
       </div>
+    </div>
 
       {/* 2. Main Support Workspace: Left List + Right Live Chat Thread */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

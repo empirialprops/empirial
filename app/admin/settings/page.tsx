@@ -235,9 +235,24 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="space-y-8">
-      <div className="border-b border-white/10 pb-4">
-        <h1 className="text-xl font-semibold sm:text-2xl text-white">System Settings & Configuration</h1>
-        <p className="text-xs text-slate-400 font-mono">Configure site branding, logos, social networks, and database seeder utilities.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-5">
+        <div>
+          <h1 className="text-xl font-semibold sm:text-2xl bg-gradient-to-b from-foreground to-muted-foreground text-transparent bg-clip-text">
+            System Settings & Configuration
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Configure site branding, logos, contact info, about us details, social networks, and database utilities.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleSave}
+          className="px-5 py-2.5 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 font-semibold text-xs transition-all cursor-pointer shadow flex items-center gap-2 self-start sm:self-auto"
+        >
+          <CheckCircle2 className="w-4 h-4" />
+          <span>Save Changes</span>
+        </button>
       </div>
 
       <form onSubmit={handleSave} className="bg-elevation-surface border border-white/10 rounded-2xl p-6 sm:p-8 space-y-6">

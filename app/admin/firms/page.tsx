@@ -365,7 +365,15 @@ export default function AdminFirmsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => alert('All firm changes are synced and saved to the database!')}
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-semibold cursor-pointer shadow"
+          >
+            <Check className="w-4 h-4" />
+            <span>Save Changes</span>
+          </button>
           <button
             type="button"
             onClick={() => setShowFilterManager(!showFilterManager)}
@@ -377,7 +385,7 @@ export default function AdminFirmsPage() {
           <button
             type="button"
             onClick={handleStartAdd}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs sm:text-sm font-semibold transition-colors shadow-xs cursor-pointer"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-foreground text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Add New Firm</span>

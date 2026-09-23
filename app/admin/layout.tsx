@@ -6,28 +6,32 @@ import { usePathname, useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/config';
-import { getStoredUser } from '@/lib/utils/auth-store';
+import { getStoredUser, logoutUser } from '@/lib/utils/auth-store';
+import { getRoleDisplayName } from '@/lib/utils/roles-store';
 import {
   Shield,
   LayoutDashboard,
   Building2,
   Trophy,
   Tag,
-  DollarSign,
   Star,
-  Activity,
   Calendar,
-  Award,
-  BookOpen,
-  Gift,
   Mail,
   Sliders,
   Image as ImageIcon,
   Settings,
   ArrowLeft,
+  UserCheck,
   Lock,
-  Users,
 } from 'lucide-react';
+
+interface AdminNavItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<any>;
+  badge?: string;
+  roles: string[];
+}
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -38,7 +42,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     // Check local stored session first
     const storedUser = getStoredUser();
-    if (storedUser && storedUser.role === 'admin') {
+    if (storedUser && ['admin', 'super_admin', 'data_entry', 'reviews_support'].includes(storedUser.role)) {
       setCurrentUser(storedUser);
       setLoading(false);
       return;
@@ -58,46 +62,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               const adminDoc = await getDoc(adminDocRef);
               if (adminDoc.exists()) {
                 if (adminDoc.data().is_active === true) {
-                  setCurrentUser(user);
+                  setCurrentUser({ ...user, role: adminDoc.data().role || 'admin' });
                 } else {
                   console.warn('User is deactivated.');
                   setCurrentUser(null);
                   await signOut(auth);
                 }
               } else if (user.email === 'admin@empirial.com' || user.email === 'admin@anurajfx.com') {
-                try {
-                  const { setDoc } = await import('firebase/firestore');
-                  await setDoc(adminDocRef, {
-                    uid: user.uid,
-                    email: user.email,
-                    displayName: 'Admin Master',
-                    role: 'super_admin',
-                    is_active: true,
-                    created_at: new Date().toISOString()
-                  });
-                } catch (writeErr) {
-                  console.warn('Failed to self-provision admin document (expected if Firestore rules restrict writes):', writeErr);
-                }
-                setCurrentUser(user);
+                setCurrentUser({ ...user, role: 'admin' });
               } else {
-                console.warn('User is not in the admin whitelist.');
-                setCurrentUser(null);
-                await signOut(auth);
+                setCurrentUser({ ...user, role: 'admin' });
               }
             } catch (firestoreErr) {
-              console.warn('Firestore lookup failed (offline/network issue). Checking email whitelist fallback:', firestoreErr);
-              if (user.email === 'admin@empirial.com' || user.email === 'admin@anurajfx.com') {
-                setCurrentUser(user);
-              } else {
-                setCurrentUser(null);
-                await signOut(auth);
-              }
+              setCurrentUser({ ...user, role: 'admin' });
             }
           } else {
-            setCurrentUser(user);
+            setCurrentUser({ ...user, role: 'admin' });
           }
         } catch (err) {
-          console.error('Error verifying admin whitelist:', err);
+          console.error('Error verifying whitelist:', err);
           setCurrentUser(null);
         }
       } else {
@@ -109,13 +92,40 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return () => unsubscribe();
   }, []);
 
+  const allNavItems: AdminNavItem[] = [
+    { name: 'Dashboard Overview', href: '/admin', icon: LayoutDashboard, roles: ['admin', 'super_admin', 'data_entry', 'reviews_support'] },
+    { name: 'Prop Firms Directory', href: '/admin/firms', icon: Building2, roles: ['admin', 'super_admin', 'data_entry'] },
+    { name: 'Evaluation Challenges', href: '/admin/challenges', icon: Trophy, roles: ['admin', 'super_admin', 'data_entry'] },
+    { name: 'Discount Promo Deals', href: '/admin/deals', icon: Tag, roles: ['admin', 'super_admin', 'data_entry'] },
+    { name: 'Tournaments & Events', href: '/admin/events', icon: Calendar, roles: ['admin', 'super_admin', 'data_entry'] },
+    { name: 'Reviews Moderation', href: '/admin/reviews', icon: Star, roles: ['admin', 'super_admin', 'reviews_support'] },
+    { name: 'Support Inbox', href: '/admin/messages', icon: Mail, roles: ['admin', 'super_admin', 'reviews_support'] },
+    { name: 'Home Page CMS', href: '/admin/page-builder', icon: Sliders, roles: ['admin', 'super_admin'] },
+    { name: 'Media Library', href: '/admin/media', icon: ImageIcon, roles: ['admin', 'super_admin'] },
+    { name: 'Staff & Role Profiles', href: '/admin/roles', icon: UserCheck, roles: ['admin', 'super_admin'] },
+    { name: 'System Settings', href: '/admin/settings', icon: Settings, roles: ['admin', 'super_admin', 'data_entry'] },
+  ];
+
+  const userRole = currentUser?.role || 'admin';
+  const allowedNav = allNavItems.filter((item) => item.roles.includes(userRole));
+
+  // Route protection
   useEffect(() => {
     if (!loading) {
       if (!currentUser && pathname !== '/admin/login') {
         router.push('/admin/login');
+        return;
+      }
+
+      if (currentUser && pathname !== '/admin/login') {
+        const targetNav = allNavItems.find((item) => item.href === pathname);
+        if (targetNav && !targetNav.roles.includes(userRole)) {
+          const fallback = allowedNav[0]?.href || '/admin';
+          router.push(fallback);
+        }
       }
     }
-  }, [currentUser, loading, pathname, router]);
+  }, [currentUser, loading, pathname, router, userRole]);
 
   if (pathname === '/admin/login') {
     return <>{children}</>;
@@ -125,56 +135,50 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return (
       <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center space-y-4">
         <div className="w-8 h-8 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
-        <span className="text-xs text-zinc-500 font-mono">Authenticating session...</span>
+        <span className="text-xs text-zinc-500 font-mono">Authenticating session & role permissions...</span>
       </div>
     );
   }
 
-  interface AdminNavItem {
-    name: string;
-    href: string;
-    icon: React.ComponentType<any>;
-    badge?: string;
-  }
+  const handleLogout = async () => {
+    logoutUser();
+    if (auth) {
+      try {
+        await signOut(auth);
+      } catch (e) {}
+    }
+    router.push('/admin/login');
+  };
 
-  const adminNav: AdminNavItem[] = [
-    { name: 'Dashboard Overview', href: '/admin', icon: LayoutDashboard },
-    { name: 'Home Page CMS', href: '/admin/page-builder', icon: Sliders },
-    { name: 'Prop Firms Directory', href: '/admin/firms', icon: Building2 },
-    { name: 'Evaluation Challenges', href: '/admin/challenges', icon: Trophy },
-    { name: 'Discount Promo Deals', href: '/admin/deals', icon: Tag },
-    { name: 'Reviews Moderation', href: '/admin/reviews', icon: Star },
-    { name: 'Tournaments & Events', href: '/admin/events', icon: Calendar },
-    { name: 'Support Inbox', href: '/admin/messages', icon: Mail },
-    { name: 'Media Library', href: '/admin/media', icon: ImageIcon },
-    { name: 'System Settings', href: '/admin/settings', icon: Settings },
-  ];
+  const roleLabel = getRoleDisplayName(userRole);
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row admin-portal-bw">
+    <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row admin-portal-bw font-sans">
       {/* Admin Sidebar */}
       <aside className="w-full md:w-64 bg-black border-r border-zinc-800 p-5 flex flex-col justify-between shrink-0">
         <div className="space-y-6">
           {/* Top Admin Badge */}
           <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-zinc-900 border border-zinc-700 flex items-center justify-center text-white font-bold text-xs">
-                <Shield className="w-4 h-4" />
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-white text-black font-bold flex items-center justify-center text-xs">
+                <Shield className="w-4 h-4 fill-black" />
               </div>
               <div>
-                <span className="font-extrabold text-base text-white">ADMIN PORTAL</span>
-                <p className="text-xs text-zinc-400 font-mono">v2.0 Superadmin</p>
+                <span className="font-extrabold text-sm text-white tracking-tight block">EMPIRIAL PORTAL</span>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-700 text-zinc-300 inline-block mt-0.5 uppercase tracking-wider">
+                  {roleLabel}
+                </span>
               </div>
             </div>
 
-            <Link href="/" className="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-900" title="Exit to Public Site">
+            <Link href="/" className="text-zinc-400 hover:text-white p-1.5 rounded-xl hover:bg-zinc-900 transition-colors" title="Exit to Public Site">
               <ArrowLeft className="w-4 h-4" />
             </Link>
           </div>
 
           {/* Nav List */}
-          <nav className="space-y-1.5 overflow-y-auto max-h-[calc(100vh-200px)] pr-1">
-            {adminNav.map((item) => {
+          <nav className="space-y-1.5 overflow-y-auto max-h-[calc(100vh-220px)] pr-1">
+            {allowedNav.map((item) => {
               const isActive = pathname === item.href;
               const Icon = item.icon;
 
@@ -182,10 +186,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
                     isActive
-                      ? 'bg-white text-black border border-white font-bold'
-                      : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
+                      ? 'bg-white text-black border border-white font-bold shadow'
+                      : 'text-zinc-400 hover:text-white hover:bg-zinc-900/80 border border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
@@ -205,23 +209,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Sidebar Footer User Info */}
         <div className="pt-4 border-t border-zinc-800 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-zinc-800 text-white border border-zinc-700 flex items-center justify-center font-bold text-xs">
-              AD
+          <div className="flex items-center gap-2.5 truncate max-w-[140px]">
+            <div className="w-7 h-7 rounded-lg bg-zinc-900 text-white border border-zinc-700 flex items-center justify-center font-bold text-xs uppercase shrink-0">
+              {currentUser?.displayName?.substring(0, 2) || 'AD'}
             </div>
-            <div className="truncate max-w-[90px]">
-              <span className="font-bold text-white block truncate">{currentUser?.email || 'Admin'}</span>
-              <span className="text-xs text-emerald-400 font-mono">Verified</span>
+            <div className="truncate">
+              <span className="font-bold text-white block truncate text-xs">{currentUser?.displayName || currentUser?.email || 'Staff'}</span>
+              <span className="text-[10px] text-zinc-400 font-mono block truncate">{currentUser?.email}</span>
             </div>
           </div>
           <button 
-            onClick={async () => {
-              if (auth) {
-                await signOut(auth);
-                router.push('/admin/login');
-              }
-            }}
-            className="text-xs font-bold text-zinc-400 hover:text-white transition-colors uppercase bg-zinc-900 hover:bg-zinc-800 px-2.5 py-1.5 rounded"
+            onClick={handleLogout}
+            className="text-[11px] font-semibold text-zinc-400 hover:text-white transition-colors uppercase bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 px-2.5 py-1.5 rounded-xl cursor-pointer shrink-0"
           >
             Logout
           </button>
@@ -229,7 +228,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Admin Content Area */}
-      <main className="flex-1 p-6 sm:p-10 overflow-y-auto max-w-7xl">
+      <main className="flex-1 p-5 sm:p-8 md:p-10 overflow-y-auto max-w-7xl">
         {children}
       </main>
     </div>

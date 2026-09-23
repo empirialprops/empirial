@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, isFirebaseConfigured } from '@/lib/firebase/config';
 import { saveUser, DEMO_ADMIN } from '@/lib/utils/auth-store';
-import { ShieldAlert, ShieldCheck, Lock, Mail, ArrowRight, Zap } from 'lucide-react';
+import { authenticateStaffCredentials } from '@/lib/utils/roles-store';
+import { ShieldAlert, ShieldCheck, Lock, Mail, ArrowRight, Zap, UserCheck } from 'lucide-react';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -53,13 +54,47 @@ export default function AdminLoginPage() {
     setIsLoading(true);
     setError(null);
 
+    // 1. Check local staff credentials database first
+    const staffMatch = authenticateStaffCredentials(email, password);
+    if (staffMatch) {
+      const userObj = {
+        uid: staffMatch.id,
+        email: staffMatch.email,
+        displayName: staffMatch.displayName,
+        role: staffMatch.role as any,
+        phoneNumber: '',
+        traderId: `STAFF-${staffMatch.id}`,
+        points: 0,
+        accountsPurchased: [],
+        is_verified: true,
+      };
+      saveUser(userObj as any);
+      router.push('/admin');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       if (!isFirebaseConfigured) {
-        // Automatic fallback if Firebase API key environment variables are missing
+        // Fallback for unconfigured Firebase
         handleLocalAdminLogin();
         return;
       }
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      if (userCredential?.user) {
+        const userObj = {
+          uid: userCredential.user.uid,
+          email: userCredential.user.email || email,
+          displayName: userCredential.user.displayName || 'Staff Administrator',
+          role: 'admin' as any,
+          phoneNumber: '',
+          traderId: `ADM-${userCredential.user.uid.substring(0, 5)}`,
+          points: 0,
+          accountsPurchased: [],
+          is_verified: true,
+        };
+        saveUser(userObj as any);
+      }
       router.push('/admin');
     } catch (err: any) {
       console.error('Sign-in error:', err);
@@ -67,7 +102,7 @@ export default function AdminLoginPage() {
         setError('Firebase API key is unconfigured or invalid. Entering Local Sandbox Admin mode...');
         setTimeout(() => handleLocalAdminLogin(), 1000);
       } else if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        setError('Invalid administrative credentials. Access denied.');
+        setError('Invalid staff credentials. Access denied. Check email & password.');
       } else {
         setError(err.message || 'An error occurred during authentication.');
       }
