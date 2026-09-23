@@ -121,14 +121,16 @@ export function ReviewsClient() {
   };
 
   // Open Review modal pre-selecting a specific firm (Requires Account)
-  const handleOpenReviewModal = (firmId: string, e?: React.MouseEvent) => {
+  const handleOpenReviewModal = (firmId?: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const user = getStoredUser();
     if (!user) {
       openAuthModal();
       return;
     }
-    setSelectedModalFirmId(firmId);
+    const availableFirms = firmsList.length > 0 ? firmsList : MOCK_FIRMS;
+    const targetId = firmId || availableFirms[0]?.id || availableFirms[0]?.slug || 'dolvero';
+    setSelectedModalFirmId(targetId);
     setFullName(user.displayName || '');
     setIsSubmitOpen(true);
     setIsSubmittedSuccess(false);
@@ -915,8 +917,8 @@ export function ReviewsClient() {
                           onChange={(e) => setSelectedModalFirmId(e.target.value)}
                           className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-black dark:focus:border-white"
                         >
-                          {MOCK_FIRMS.map((f) => (
-                            <option key={f.id} value={f.id}>
+                          {(firmsList.length > 0 ? firmsList : MOCK_FIRMS).map((f) => (
+                            <option key={f.id || f.slug} value={f.id || f.slug}>
                               {f.name}
                             </option>
                           ))}
