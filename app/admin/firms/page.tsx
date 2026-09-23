@@ -27,6 +27,7 @@ import {
 import { MOCK_FIRMS } from '@/lib/data/firms-data';
 import { Firm } from '@/lib/types';
 import { getFirms, createFirm, updateFirm, deleteFirm } from '@/lib/firebase/services';
+import { logAdminAction } from '@/lib/utils/audit-log-store';
 
 const ALL_PLATFORMS = [
   { id: 'mt5', name: 'MetaTrader 5', icon: '/platforms/mt5.png' },
@@ -249,13 +250,21 @@ export default function AdminFirmsPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to permanently remove this firm profile?')) return;
+    const targetFirm = firms.find((f) => f.id === id);
     try {
       await deleteFirm(id);
-      setFirms(firms.filter((f) => f.id !== id));
     } catch (err) {
       console.error('Failed to delete firm:', err);
-      setFirms(firms.filter((f) => f.id !== id));
     }
+    setFirms(firms.filter((f) => f.id !== id));
+    logAdminAction({
+      action: `Deleted Prop Firm: ${targetFirm?.name || id}`,
+      module: 'firms',
+      target_id: id,
+      entity_name: targetFirm?.name || id,
+      previous_state: targetFirm || null,
+      new_state: null,
+    });
   };
 
   const parseNum = (val: any, fallback: number): number => {
@@ -314,19 +323,34 @@ export default function AdminFirmsPage() {
     if (editingFirm) {
       try {
         await updateFirm(editingFirm.id, firmPayload);
-        setFirms(firms.map((f) => (f.id === editingFirm.id ? { ...f, ...firmPayload } : f)));
       } catch (err) {
         console.error('Failed to update firm:', err);
-        setFirms(firms.map((f) => (f.id === editingFirm.id ? { ...f, ...firmPayload } : f)));
       }
+      setFirms(firms.map((f) => (f.id === editingFirm.id ? { ...f, ...firmPayload } : f)));
+      logAdminAction({
+        action: `Updated Prop Firm: ${firmPayload.name}`,
+        module: 'firms',
+        target_id: editingFirm.id,
+        entity_name: firmPayload.name,
+        previous_state: editingFirm,
+        new_state: { id: editingFirm.id, ...firmPayload },
+      });
     } else {
+      let createdId = slug;
       try {
-        const id = await createFirm(firmPayload);
-        setFirms([{ id, ...firmPayload }, ...firms]);
+        createdId = await createFirm(firmPayload);
       } catch (err) {
         console.error('Failed to create firm:', err);
-        setFirms([{ id: slug, ...firmPayload }, ...firms]);
       }
+      setFirms([{ id: createdId, ...firmPayload }, ...firms]);
+      logAdminAction({
+        action: `Created Prop Firm: ${firmPayload.name}`,
+        module: 'firms',
+        target_id: createdId,
+        entity_name: firmPayload.name,
+        previous_state: null,
+        new_state: { id: createdId, ...firmPayload },
+      });
     }
 
     setIsAdding(false);

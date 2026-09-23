@@ -5,6 +5,7 @@ import { Settings, CheckCircle2, Database, AlertTriangle, Globe, Shield, ShieldC
 import { seedDatabase } from '@/lib/firebase/seeder';
 import { getSiteSettings, updateSiteSettings, invalidateSiteSettingsCache } from '@/lib/firebase/services';
 import { syncAllExistingUsersToGoogleSheet, DEFAULT_SHEETS_WEBHOOK_URL } from '@/lib/firebase/sheets-sync';
+import { logAdminAction } from '@/lib/utils/audit-log-store';
 
 export default function AdminSettingsPage() {
   const [sheetsSyncing, setSheetsSyncing] = useState(false);
@@ -140,7 +141,7 @@ export default function AdminSettingsPage() {
     e.preventDefault();
     try {
       invalidateSiteSettingsCache();
-      await updateSiteSettings({
+      const newSettingsPayload = {
         brandName,
         shortName,
         tagline,
@@ -175,6 +176,15 @@ export default function AdminSettingsPage() {
           { value: Number(stat3Value), suffix: stat3Suffix, label: stat3Label },
           { value: Number(stat4Value), suffix: stat4Suffix, label: stat4Label }
         ]
+      };
+      await updateSiteSettings(newSettingsPayload);
+      logAdminAction({
+        action: `Updated Site Settings & Configuration`,
+        module: 'settings',
+        target_id: 'site_settings',
+        entity_name: 'System Configuration',
+        previous_state: null,
+        new_state: newSettingsPayload,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);

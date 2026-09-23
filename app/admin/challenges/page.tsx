@@ -27,6 +27,7 @@ import {
   updateChallenge,
   deleteChallenge,
 } from '@/lib/firebase/services';
+import { logAdminAction } from '@/lib/utils/audit-log-store';
 
 export default function AdminChallengesPage() {
   const [challenges, setChallenges] = useState<Challenge[]>([]);
@@ -175,14 +176,22 @@ export default function AdminChallengesPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this challenge tier?')) return;
+    if (!confirm('Are you sure you want to permanently remove this evaluation challenge?')) return;
+    const targetChallenge = challenges.find((c) => c.id === id);
     try {
       await deleteChallenge(id);
-      setChallenges(challenges.filter((c) => c.id !== id));
     } catch (err) {
       console.error('Failed to delete challenge:', err);
-      setChallenges(challenges.filter((c) => c.id !== id));
     }
+    setChallenges(challenges.filter((c) => c.id !== id));
+    logAdminAction({
+      action: `Deleted Challenge: ${targetChallenge?.name || id}`,
+      module: 'challenges',
+      target_id: id,
+      entity_name: targetChallenge?.name || id,
+      previous_state: targetChallenge || null,
+      new_state: null,
+    });
   };
 
   const parseNum = (val: any, fallback: number): number => {
@@ -240,19 +249,36 @@ export default function AdminChallengesPage() {
     if (editingChallenge) {
       try {
         await updateChallenge(editingChallenge.id, payload);
-        setChallenges(challenges.map((c) => (c.id === editingChallenge.id ? { ...c, ...payload } : c)));
       } catch (err) {
         console.error('Failed to update challenge:', err);
-        setChallenges(challenges.map((c) => (c.id === editingChallenge.id ? { ...c, ...payload } : c)));
       }
+      const updatedItem = { ...editingChallenge, ...payload };
+      setChallenges(challenges.map((c) => (c.id === editingChallenge.id ? updatedItem : c)));
+      logAdminAction({
+        action: `Updated Challenge: ${payload.name}`,
+        module: 'challenges',
+        target_id: editingChallenge.id,
+        entity_name: payload.name,
+        previous_state: editingChallenge,
+        new_state: updatedItem,
+      });
     } else {
+      let createdId = 'ch-' + Date.now();
       try {
-        const id = await createChallenge(payload);
-        setChallenges([{ id, ...payload }, ...challenges]);
+        createdId = await createChallenge(payload);
       } catch (err) {
         console.error('Failed to create challenge:', err);
-        setChallenges([{ id: 'ch-' + Date.now(), ...payload }, ...challenges]);
       }
+      const newItem = { id: createdId, ...payload };
+      setChallenges([newItem, ...challenges]);
+      logAdminAction({
+        action: `Created Challenge: ${payload.name}`,
+        module: 'challenges',
+        target_id: createdId,
+        entity_name: payload.name,
+        previous_state: null,
+        new_state: newItem,
+      });
     }
 
     setIsAdding(false);

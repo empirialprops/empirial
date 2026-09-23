@@ -29,6 +29,7 @@ import {
   deleteStaffProfile,
   getRoleDisplayName,
 } from '@/lib/utils/roles-store';
+import { logAdminAction } from '@/lib/utils/audit-log-store';
 
 export default function AdminRolesPage() {
   const [profiles, setProfiles] = useState<StaffProfile[]>([]);
@@ -81,21 +82,25 @@ export default function AdminRolesPage() {
     if (!formEmail.trim() || !formName.trim()) return;
 
     if (editingProfile) {
-      const updatedList = profiles.map((p) => {
-        if (p.id === editingProfile.id) {
-          return {
-            ...p,
-            email: formEmail.trim().toLowerCase(),
-            password: formPassword.trim() || p.password,
-            displayName: formName.trim(),
-            role: formRole,
-            is_active: formActive,
-            updated_at: new Date().toISOString(),
-          };
-        }
-        return p;
-      });
+      const updatedItem = {
+        ...editingProfile,
+        email: formEmail.trim().toLowerCase(),
+        password: formPassword.trim() || editingProfile.password,
+        displayName: formName.trim(),
+        role: formRole,
+        is_active: formActive,
+        updated_at: new Date().toISOString(),
+      };
+      const updatedList = profiles.map((p) => (p.id === editingProfile.id ? updatedItem : p));
       setProfiles(updatedList);
+      logAdminAction({
+        action: `Updated Staff Role Profile: ${formName}`,
+        module: 'roles',
+        target_id: editingProfile.id,
+        entity_name: formName,
+        previous_state: editingProfile,
+        new_state: updatedItem,
+      });
     } else {
       const newStaff: StaffProfile = {
         id: `staff-${Date.now()}`,
@@ -108,6 +113,14 @@ export default function AdminRolesPage() {
         updated_at: new Date().toISOString(),
       };
       setProfiles([newStaff, ...profiles]);
+      logAdminAction({
+        action: `Created Staff Role Profile: ${formName} (${formRole})`,
+        module: 'roles',
+        target_id: newStaff.id,
+        entity_name: formName,
+        previous_state: null,
+        new_state: newStaff,
+      });
     }
 
     setIsUnsaved(true);
