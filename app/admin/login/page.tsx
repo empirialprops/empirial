@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, isFirebaseConfigured } from '@/lib/firebase/config';
-import { saveUser, DEMO_ADMIN } from '@/lib/utils/auth-store';
+import { saveUser, getStoredUser, DEMO_ADMIN } from '@/lib/utils/auth-store';
 import { authenticateStaffCredentials } from '@/lib/utils/roles-store';
 import { ShieldAlert, ShieldCheck, Lock, Mail, ArrowRight, Zap, UserCheck } from 'lucide-react';
 
@@ -15,9 +15,27 @@ export default function AdminLoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  // If already logged in as staff/admin, immediately redirect to dashboard
+  useEffect(() => {
+    const stored = getStoredUser();
+    if (stored && ['admin', 'super_admin', 'data_entry', 'reviews_support'].includes(stored.role)) {
+      router.replace('/admin');
+    }
+
+    const handleAuth = (e: any) => {
+      const user = e?.detail || getStoredUser();
+      if (user && ['admin', 'super_admin', 'data_entry', 'reviews_support'].includes(user.role)) {
+        router.replace('/admin');
+      }
+    };
+
+    window.addEventListener('auth-changed', handleAuth);
+    return () => window.removeEventListener('auth-changed', handleAuth);
+  }, [router]);
+
   const handleLocalAdminLogin = () => {
     saveUser(DEMO_ADMIN);
-    router.push('/admin');
+    router.replace('/admin');
   };
 
   const handleAutoRegister = async () => {
@@ -69,7 +87,7 @@ export default function AdminLoginPage() {
         is_verified: true,
       };
       saveUser(userObj as any);
-      router.push('/admin');
+      router.replace('/admin');
       setIsLoading(false);
       return;
     }
@@ -95,7 +113,7 @@ export default function AdminLoginPage() {
         };
         saveUser(userObj as any);
       }
-      router.push('/admin');
+      router.replace('/admin');
     } catch (err: any) {
       console.error('Sign-in error:', err);
       if (err.code === 'auth/api-key-not-valid' || err.message?.includes('api-key-not-valid')) {
@@ -206,7 +224,7 @@ export default function AdminLoginPage() {
           </button>
           <button
             onClick={() => router.push('/')}
-            className="text-[10px] text-zinc-500 hover:text-white transition-colors animate-pulse"
+            className="text-[10px] text-zinc-500 hover:text-white transition-colors animate-pulse cursor-pointer"
           >
             ← Return to public website
           </button>

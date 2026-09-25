@@ -42,11 +42,12 @@ export default function Pricing() {
       evalType: "( 1-Step )",
       isMostPop: false,
       profitTarget: "6%",
-      drawdownDaily: "4%",
-      drawdownMax: "6%",
+      drawdownDaily: "2%",
+      drawdownMax: "4%",
       lossType: "Trailing",
-      profitSplit: "80%",
-      discount: "20% DISCOUNT",
+      profitSplit: "Up to 100%",
+      discount: "42% OFF",
+      copyBtnText: "42% OFF",
       code: "EMPIRE",
       buyUrl: "/challenges?firm=nys-capital&step=1",
     },
@@ -63,8 +64,9 @@ export default function Pricing() {
       drawdownDaily: "5%",
       drawdownMax: "10%",
       lossType: "Static",
-      profitSplit: "85%",
-      discount: "28% DISCOUNT",
+      profitSplit: "Up to 80%",
+      discount: "30% OFF",
+      copyBtnText: "30% OFF",
       code: "EMPIRE",
       buyUrl: "/challenges?firm=ck-capital&step=2",
     },
@@ -83,10 +85,29 @@ export default function Pricing() {
       lossType: "Static",
       profitSplit: "80%",
       discount: "20% DISCOUNT",
+      copyBtnText: "20% OFF",
       code: "EMPIRE",
       buyUrl: "/challenges?firm=alpha-capital&step=0",
     },
   ];
+
+  const getCopyButtonLabel = (firm: any) => {
+    if (copiedCode === firm.id) return "Copied!";
+    if (hasCopiedCodes[firm.id]) return "Code Copied ✓";
+
+    if (firm.copyBtnText) return firm.copyBtnText;
+    if (firm.copy_btn_text) return firm.copy_btn_text;
+
+    if (firm.discount) {
+      const d = firm.discount.trim();
+      if (d.toUpperCase().endsWith("DISCOUNT")) {
+        return d.replace(/DISCOUNT/i, "OFF").trim();
+      }
+      return d;
+    }
+
+    return `${firm.discount_pct || 20}% OFF`;
+  };
 
   const handleCopyCode = (code: string, firmId: string) => {
     if (typeof navigator !== "undefined") {
@@ -285,11 +306,7 @@ export default function Pricing() {
                           : "border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-card dark:text-foreground dark:hover:bg-zinc-800"
                       }`}
                     >
-                      {copiedCode === firm.id
-                        ? "Copied!"
-                        : hasCopiedCodes[firm.id]
-                        ? "Code Copied ✓"
-                        : `${firm.discount_pct || 20}% OFF`}
+                      {getCopyButtonLabel(firm)}
                     </motion.button>
 
                     {/* Buy Challenge Button */}

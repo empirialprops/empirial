@@ -275,11 +275,12 @@ export default function AdminPageBuilderPage() {
               evalType: '( 1-Step )',
               isMostPop: false,
               profitTarget: '6%',
-              drawdownDaily: '4%',
-              drawdownMax: '6%',
+              drawdownDaily: '2%',
+              drawdownMax: '4%',
               lossType: 'Trailing',
-              profitSplit: '80%',
-              discount: '20% DISCOUNT',
+              profitSplit: 'Up to 100%',
+              discount: '42% OFF',
+              copyBtnText: '42% OFF',
               discountSubtitle: '( Max you can get )',
               code: 'EMPIRE',
               buyUrl: '/challenges?firm=nys-capital',
@@ -295,8 +296,9 @@ export default function AdminPageBuilderPage() {
               drawdownDaily: '5%',
               drawdownMax: '10%',
               lossType: 'Static',
-              profitSplit: '85%',
-              discount: '28% DISCOUNT',
+              profitSplit: 'Up to 80%',
+              discount: '30% OFF',
+              copyBtnText: '30% OFF',
               discountSubtitle: '( Max you can get )',
               code: 'EMPIRE',
               buyUrl: '/challenges?firm=ck-capital',
@@ -314,6 +316,7 @@ export default function AdminPageBuilderPage() {
               lossType: 'Static',
               profitSplit: '80%',
               discount: '20% DISCOUNT',
+              copyBtnText: '20% OFF',
               discountSubtitle: '( Max you can get )',
               code: 'EMPIRE',
               buyUrl: '/challenges?firm=alpha-capital',
@@ -617,6 +620,7 @@ export default function AdminPageBuilderPage() {
         accountSize: updated[index]?.accountSize || '$5K - $100K',
         profitSplit: firm.profit_split_custom || updated[index]?.profitSplit || '85%',
         discount: firm.discount_label_custom || updated[index]?.discount || '20% DISCOUNT',
+        copyBtnText: firm.discount_label_custom || updated[index]?.copyBtnText || '20% OFF',
         code: firm.coupon_code_custom || updated[index]?.code || 'EMPIRE',
         drawdownDaily: `${firm.daily_loss_pct || 5}%`,
         drawdownMax: `${firm.max_loss_pct || 10}%`,
@@ -1784,8 +1788,18 @@ export default function AdminPageBuilderPage() {
                     </div>
                   </div>
 
-                  {/* Promo Code & Directing URL */}
+                  {/* Copy Button Text & Code Empire Text */}
                   <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-semibold text-muted-foreground">Copy Button Text</label>
+                      <input
+                        type="text"
+                        value={plan.copyBtnText !== undefined ? plan.copyBtnText : (plan.copy_btn_text || '')}
+                        onChange={(e) => handleUpdatePlan(index, 'copyBtnText', e.target.value)}
+                        placeholder="e.g. 42% OFF, 30% OFF"
+                        className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-foreground font-bold"
+                      />
+                    </div>
                     <div className="space-y-1">
                       <label className="text-[10px] uppercase font-semibold text-muted-foreground">Code Empire Text</label>
                       <input
@@ -1795,15 +1809,17 @@ export default function AdminPageBuilderPage() {
                         className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-foreground font-mono font-bold"
                       />
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-semibold text-muted-foreground">Buy Directing Link</label>
-                      <input
-                        type="text"
-                        value={plan.buyUrl || `/challenges?firm=${plan.id}`}
-                        onChange={(e) => handleUpdatePlan(index, 'buyUrl', e.target.value)}
-                        className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-foreground font-semibold"
-                      />
-                    </div>
+                  </div>
+
+                  {/* Buy Directing Link */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase font-semibold text-muted-foreground">Buy Directing Link</label>
+                    <input
+                      type="text"
+                      value={plan.buyUrl || `/challenges?firm=${plan.id}`}
+                      onChange={(e) => handleUpdatePlan(index, 'buyUrl', e.target.value)}
+                      className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-foreground font-semibold"
+                    />
                   </div>
                 </div>
               </div>

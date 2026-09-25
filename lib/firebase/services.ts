@@ -3,6 +3,15 @@ import type { UserProfile } from '../utils/auth-store';
 import { syncUserToGoogleSheet } from './sheets-sync';
 import { getStoredDeals, saveStoredDeals, sortDeals } from '../utils/deals-store';
 import { 
+  getStoredChallenges, 
+  saveStoredChallenges, 
+  addStoredChallenges, 
+  addStoredChallenge, 
+  updateStoredChallenge, 
+  deleteStoredChallenge,
+  deleteMultipleStoredChallenges 
+} from '../utils/challenges-store';
+import { 
   collection, 
   doc, 
   getDocs, 
@@ -228,23 +237,40 @@ export async function deleteFirm(id: string): Promise<void> {
 // EVALUATION CHALLENGES
 // ==========================================
 export async function getChallenges(): Promise<Challenge[]> {
-  if (!db) return [];
+  const localChallenges = typeof window !== 'undefined' ? getStoredChallenges() : [];
+  if (!db) return localChallenges;
   try {
     const colRef = collection(db, 'challenges');
     const snap = await getDocs(colRef);
-    const list = mapSnapshot<Challenge>(snap);
-    return list.sort((a, b) => (a.price || 0) - (b.price || 0));
+    const firestoreChallenges = mapSnapshot<Challenge>(snap);
+    if (firestoreChallenges && firestoreChallenges.length > 0) {
+      const sorted = firestoreChallenges.sort((a, b) => (a.price || 0) - (b.price || 0));
+      if (typeof window !== 'undefined') {
+        saveStoredChallenges(sorted);
+      }
+      return sorted;
+    }
+    return localChallenges.length > 0 ? localChallenges : [];
   } catch (err) {
     console.error('Failed to fetch challenges from Firestore:', err);
-    return [];
+    return localChallenges.length > 0 ? localChallenges : [];
   }
 }
 
 export async function getChallengesByFirm(firmId: string): Promise<Challenge[]> {
-  if (!db) return [];
-  const colRef = collection(db, 'challenges');
-  const snap = await getDocs(query(colRef, where('firm_id', '==', firmId)));
-  return mapSnapshot<Challenge>(snap);
+  if (!db) {
+    const localChallenges = typeof window !== 'undefined' ? getStoredChallenges() : [];
+    return localChallenges.filter((c) => c.firm_id === firmId);
+  }
+  try {
+    const colRef = collection(db, 'challenges');
+    const snap = await getDocs(query(colRef, where('firm_id', '==', firmId)));
+    return mapSnapshot<Challenge>(snap);
+  } catch (err) {
+    console.error('Failed to fetch challenges by firm from Firestore:', err);
+    const localChallenges = typeof window !== 'undefined' ? getStoredChallenges() : [];
+    return localChallenges.filter((c) => c.firm_id === firmId);
+  }
 }
 
 export async function getDealsByFirm(firmId: string): Promise<Deal[]> {
@@ -269,29 +295,124 @@ export async function getPayoutsByFirm(firmId: string): Promise<Payout[]> {
 }
 
 export async function createChallenge(challenge: Omit<Challenge, 'id'>): Promise<string> {
-  if (!db) throw new Error('Firestore not initialized');
-  const docRef = doc(collection(db, 'challenges'));
-  await setDoc(docRef, {
-    ...challenge,
-    id: docRef.id,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  });
-  return docRef.id;
+  const timestamp = new Date().toISOString();
+  let createdId = `ch-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+  if (db) {
+    try {
+      const docRef = doc(collection(db, 'challenges'));
+      createdId = docRef.id;
+      const sanitized = sanitizeForFirestore({
+        ...challenge,
+        id: createdId,
+        created_at: timestamp,
+        updated_at: timestamp
+      });
+      await setDoc(docRef, sanitized);
+    } catch (err) {
+      console.warn('Firestore createChallenge error, using local fallback ID:', err);
+    }
+  }
+
+  const newChallenge: Challenge = { ...challenge, id: createdId };
+  if (typeof window !== 'undefined') {
+    addStoredChallenge(newChallenge);
+  }
+  return createdId;
+}
+
+export async function createChallengesBatch(challengesList: Omit<Challenge, 'id'>[]): Promise<Challenge[]> {
+  const timestamp = new Date().toISOString();
+  const createdItems: Challenge[] = [];
+
+  if (db) {
+    try {
+      const batch = writeBatch(db);
+      for (const ch of challengesList) {
+        const docRef = doc(collection(db, 'challenges'));
+        const fullItem: Challenge = {
+          ...ch,
+          id: docRef.id,
+        };
+        const sanitized = sanitizeForFirestore({
+          ...fullItem,
+          created_at: timestamp,
+          updated_at: timestamp,
+        });
+        batch.set(docRef, sanitized);
+        createdItems.push(fullItem);
+      }
+      await batch.commit();
+    } catch (err) {
+      console.warn('Firestore batch write failed, falling back to client-generated IDs:', err);
+    }
+  }
+
+  // Fallback if Firestore was unavailable
+  if (createdItems.length === 0) {
+    for (let i = 0; i < challengesList.length; i++) {
+      const ch = challengesList[i];
+      const fallbackId = `ch-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 6)}`;
+      createdItems.push({
+        ...ch,
+        id: fallbackId,
+      });
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    addStoredChallenges(createdItems);
+  }
+
+  return createdItems;
 }
 
 export async function updateChallenge(id: string, challenge: Partial<Challenge>): Promise<void> {
-  if (!db) return;
-  const docRef = doc(db, 'challenges', id);
-  await updateDoc(docRef, {
-    ...challenge,
-    updated_at: new Date().toISOString()
-  });
+  if (db) {
+    try {
+      const docRef = doc(db, 'challenges', id);
+      const sanitized = sanitizeForFirestore({
+        ...challenge,
+        updated_at: new Date().toISOString()
+      });
+      await updateDoc(docRef, sanitized);
+    } catch (err) {
+      console.warn('Firestore updateChallenge error:', err);
+    }
+  }
+  if (typeof window !== 'undefined') {
+    updateStoredChallenge(id, challenge);
+  }
 }
 
 export async function deleteChallenge(id: string): Promise<void> {
-  if (!db) return;
-  await deleteDoc(doc(db, 'challenges', id));
+  if (db) {
+    try {
+      await deleteDoc(doc(db, 'challenges', id));
+    } catch (err) {
+      console.warn('Firestore deleteChallenge error:', err);
+    }
+  }
+  if (typeof window !== 'undefined') {
+    deleteStoredChallenge(id);
+  }
+}
+
+export async function deleteChallengesBatch(ids: string[]): Promise<void> {
+  if (db) {
+    try {
+      const batch = writeBatch(db);
+      for (const id of ids) {
+        batch.delete(doc(db, 'challenges', id));
+      }
+      await batch.commit();
+    } catch (err) {
+      console.warn('Firestore deleteChallengesBatch error:', err);
+    }
+  }
+  if (typeof window !== 'undefined') {
+    deleteMultipleStoredChallenges(ids);
+  }
 }
 
 // ==========================================

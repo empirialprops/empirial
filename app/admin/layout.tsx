@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -34,24 +34,54 @@ interface AdminNavItem {
   roles: string[];
 }
 
+const STAFF_ROLES = ['admin', 'super_admin', 'data_entry', 'reviews_support'];
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+    const stored = getStoredUser();
+    return stored && STAFF_ROLES.includes(stored.role) ? stored : null;
+  });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Check local stored session first
+  const syncUserSession = useCallback(() => {
     const storedUser = getStoredUser();
-    if (storedUser && ['admin', 'super_admin', 'data_entry', 'reviews_support'].includes(storedUser.role)) {
+    if (storedUser && STAFF_ROLES.includes(storedUser.role)) {
       setCurrentUser(storedUser);
       setLoading(false);
-      return;
+      return storedUser;
     }
+    return null;
+  }, []);
+
+  useEffect(() => {
+    // 1. Check local stored session first
+    const local = syncUserSession();
+    if (local) {
+      setLoading(false);
+    }
+
+    // 2. Listen to custom auth events and storage events
+    const handleAuthEvent = (e?: any) => {
+      const updated = e?.detail || getStoredUser();
+      if (updated && STAFF_ROLES.includes(updated.role)) {
+        setCurrentUser(updated);
+      } else {
+        setCurrentUser(null);
+      }
+      setLoading(false);
+    };
+
+    window.addEventListener('auth-changed', handleAuthEvent);
+    window.addEventListener('storage', handleAuthEvent);
 
     if (!auth) {
       setLoading(false);
-      return;
+      return () => {
+        window.removeEventListener('auth-changed', handleAuthEvent);
+        window.removeEventListener('storage', handleAuthEvent);
+      };
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -82,21 +112,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           }
         } catch (err) {
           console.error('Error verifying whitelist:', err);
-          setCurrentUser(null);
+          const fallback = getStoredUser();
+          if (!fallback || !STAFF_ROLES.includes(fallback.role)) {
+            setCurrentUser(null);
+          }
         }
       } else {
-        setCurrentUser(null);
+        const fallback = getStoredUser();
+        if (!fallback || !STAFF_ROLES.includes(fallback.role)) {
+          setCurrentUser(null);
+        }
       }
       setLoading(false);
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      window.removeEventListener('auth-changed', handleAuthEvent);
+      window.removeEventListener('storage', handleAuthEvent);
+      unsubscribe();
+    };
+  }, [pathname, syncUserSession]);
 
   const allNavItems: AdminNavItem[] = [
     { name: 'Dashboard Overview', href: '/admin', icon: LayoutDashboard, roles: ['admin', 'super_admin', 'data_entry', 'reviews_support'] },
     { name: 'Prop Firms Directory', href: '/admin/firms', icon: Building2, roles: ['admin', 'super_admin', 'data_entry'] },
-    { name: 'Evaluation Challenges', href: '/admin/challenges', icon: Trophy, roles: ['admin', 'super_admin', 'data_entry'] },
+    { name: 'Evaluation Challenges', href: '/admin/challenges', icon: Trophy, badge: 'Portal', roles: ['admin', 'super_admin', 'data_entry'] },
     { name: 'Discount Promo Deals', href: '/admin/deals', icon: Tag, roles: ['admin', 'super_admin', 'data_entry'] },
     { name: 'Tournaments & Events', href: '/admin/events', icon: Calendar, roles: ['admin', 'super_admin', 'data_entry'] },
     { name: 'Reviews Moderation', href: '/admin/reviews', icon: Star, roles: ['admin', 'super_admin', 'reviews_support'] },
@@ -114,20 +154,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Route protection
   useEffect(() => {
     if (!loading) {
-      if (!currentUser && pathname !== '/admin/login') {
-        router.push('/admin/login');
+      const activeUser = currentUser || getStoredUser();
+      const isStaff = activeUser && STAFF_ROLES.includes(activeUser.role);
+
+      if (!isStaff && pathname !== '/admin/login') {
+        router.replace('/admin/login');
         return;
       }
 
-      if (currentUser && pathname !== '/admin/login') {
+      if (isStaff && pathname === '/admin/login') {
+        router.replace('/admin');
+        return;
+      }
+
+      if (isStaff && pathname !== '/admin/login') {
         const targetNav = allNavItems.find((item) => item.href === pathname);
-        if (targetNav && !targetNav.roles.includes(userRole)) {
+        if (targetNav && !targetNav.roles.includes(activeUser.role)) {
           const fallback = allowedNav[0]?.href || '/admin';
-          router.push(fallback);
+          router.replace(fallback);
         }
       }
     }
-  }, [currentUser, loading, pathname, router, userRole]);
+  }, [currentUser, loading, pathname, router, userRole, allowedNav]);
 
   if (pathname === '/admin/login') {
     return <>{children}</>;
@@ -144,12 +192,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const handleLogout = async () => {
     logoutUser();
+    setCurrentUser(null);
     if (auth) {
       try {
         await signOut(auth);
       } catch (e) {}
     }
-    router.push('/admin/login');
+    router.replace('/admin/login');
   };
 
   const roleLabel = getRoleDisplayName(userRole);
