@@ -40,6 +40,23 @@ export function calculateFirmMetrics(firm: Firm, allReviews: Review[]): FirmMetr
     const rName = (r.firm_name || '').toLowerCase();
     const fName = (firm.name || '').toLowerCase();
 
+    // Dedicated SLF alias resolver
+    const isFirmSlf =
+      ['sure-leverage', 'sure-leverage-funding', 'slf'].includes(fId) ||
+      ['sure-leverage', 'sure-leverage-funding', 'slf'].includes(fSlug) ||
+      fName.includes('sure leverage') ||
+      fName.includes('slf');
+
+    if (isFirmSlf) {
+      if (
+        ['sure-leverage', 'sure-leverage-funding', 'slf'].includes(rId) ||
+        rName.includes('sure leverage') ||
+        rName.includes('slf')
+      ) {
+        return true;
+      }
+    }
+
     return (
       (rId && fId && rId === fId) ||
       (rId && fSlug && rId === fSlug) ||

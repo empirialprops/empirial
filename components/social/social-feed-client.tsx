@@ -327,14 +327,14 @@ export function SocialFeedClient() {
                 </Link>
               </div>
 
-              {/* Topstep Deal */}
+              {/* Shark Funded Deal */}
               <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-2.5">
                 <div className="flex items-center gap-3">
                   {/* Big Firm Logo */}
                   <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shrink-0">
                     <Image
-                      src="/logos/topstep.png"
-                      alt="Topstep"
+                      src="/logos/shark.png"
+                      alt="Shark Funded"
                       fill
                       className="object-cover"
                       sizes="48px"
@@ -342,24 +342,24 @@ export function SocialFeedClient() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-1 flex-wrap">
-                      <span className="font-bold text-sm sm:text-base text-foreground">Topstep Futures</span>
-                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-800 text-foreground">
-                        NO TRAILING
+                      <span className="font-bold text-sm sm:text-base text-foreground">Shark Funded</span>
+                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-zinc-900 text-white dark:bg-zinc-100 dark:text-black">
+                        20% OFF
                       </span>
                     </div>
-                    <span className="text-xs text-muted-foreground">Express Combine Model</span>
+                    <span className="text-xs text-muted-foreground">1-Step & 2-Step Challenges</span>
                   </div>
                 </div>
 
                 <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                  Day-start balance loss limit on 50K & 100K Express Trading Combine.
+                  Exclusive 20% discount on all evaluation accounts. Code: <strong className="text-foreground font-bold">EMPIRIAL20</strong>
                 </p>
 
                 <Link
-                  href="/firms/topstep"
+                  href="/deals"
                   className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-foreground hover:underline pt-1"
                 >
-                  <span>Explore combine rules</span>
+                  <span>Claim deal allocation</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
@@ -392,11 +392,11 @@ export function SocialFeedClient() {
                   badge: '$250K Funded Trader',
                 },
                 {
-                  id: 'author-analyst-1',
-                  name: 'Elena Vance',
-                  handle: '@elena_compliance',
-                  avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100&auto=format&fit=crop&q=80',
-                  badge: 'Compliance & Audit Lead',
+                  id: 'author-firm-shark',
+                  name: 'Shark Funded Official',
+                  handle: '@sharkfunded',
+                  avatar: '/logos/shark.png',
+                  badge: 'Prop Firm Official',
                 },
               ].map((creator) => {
                 const following = currentUser ? isUserFollowing(creator.id, currentUser) : false;

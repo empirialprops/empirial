@@ -49,6 +49,22 @@ import {
 
 import { MOCK_EVENTS } from '../data/events-data';
 import { MOCK_DEALS } from '../data/deals-data';
+import { MOCK_REVIEWS } from '../data/reviews-data';
+import { MOCK_FIRMS } from '../data/firms-data';
+import { 
+  getStoredFirms, 
+  saveStoredFirms, 
+  addStoredFirm, 
+  updateStoredFirm, 
+  deleteStoredFirm 
+} from '../utils/firms-store';
+import { 
+  getStoredReviews, 
+  saveStoredReviews, 
+  addStoredReview, 
+  updateStoredReview, 
+  deleteStoredReview 
+} from '../utils/reviews-store';
 
 // Helper to convert Firestore Snapshot to Array of items
 const mapSnapshot = <T>(snapshot: any): T[] => {
@@ -157,10 +173,23 @@ export function subscribeToOfferPoster(callback: (posterConfig: any) => void): (
 // PROP FIRMS
 // ==========================================
 export async function getFirms(): Promise<Firm[]> {
-  if (!db) return [];
-  const colRef = collection(db, 'firms');
-  const snap = await getDocs(query(colRef, orderBy('name')));
-  return mapSnapshot<Firm>(snap);
+  const localFirms = typeof window !== 'undefined' ? getStoredFirms() : [];
+  if (!db) return localFirms;
+  try {
+    const colRef = collection(db, 'firms');
+    const snap = await getDocs(query(colRef, orderBy('name')));
+    const firestoreFirms = mapSnapshot<Firm>(snap);
+    if (firestoreFirms && firestoreFirms.length > 0) {
+      if (typeof window !== 'undefined') {
+        saveStoredFirms(firestoreFirms);
+      }
+      return firestoreFirms;
+    }
+    return localFirms.length > 0 ? localFirms : MOCK_FIRMS;
+  } catch (err) {
+    console.error('Failed to fetch firms from Firestore:', err);
+    return localFirms.length > 0 ? localFirms : MOCK_FIRMS;
+  }
 }
 
 export async function getFirmBySlug(slug: string): Promise<Firm | null> {
@@ -172,65 +201,96 @@ export async function getFirmBySlug(slug: string): Promise<Firm | null> {
 }
 
 export async function createFirm(firm: Omit<Firm, 'id'> & { id?: string }): Promise<string> {
-  if (!db) throw new Error('Firestore not initialized');
   const id = firm.id || firm.name.toLowerCase().replace(/\s+/g, '-');
-  const docRef = doc(db, 'firms', id);
-  await setDoc(docRef, {
+  const fullFirm: Firm = {
     ...firm,
     id,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  });
+    rating: firm.rating || 0,
+    review_count: firm.review_count || 0,
+  };
+  if (db) {
+    try {
+      const docRef = doc(db, 'firms', id);
+      await setDoc(docRef, {
+        ...fullFirm,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error('Failed to create firm in Firestore:', err);
+    }
+  }
+  if (typeof window !== 'undefined') {
+    addStoredFirm(fullFirm);
+  }
   return id;
 }
 
 export async function updateFirm(id: string, firm: Partial<Firm>): Promise<void> {
-  if (!db) return;
-  const docRef = doc(db, 'firms', id);
-  await updateDoc(docRef, {
-    ...firm,
-    updated_at: new Date().toISOString()
-  });
+  if (db) {
+    try {
+      const docRef = doc(db, 'firms', id);
+      await updateDoc(docRef, {
+        ...firm,
+        updated_at: new Date().toISOString()
+      });
 
-  // Cascade denormalized data updates to challenges, deals, and payouts
-  if (firm.name || firm.logo_url || firm.slug) {
-    const batch = writeBatch(db);
-    
-    // Updates challenges
-    const challsSnap = await getDocs(query(collection(db, 'challenges'), where('firm_id', '==', id)));
-    challsSnap.forEach((challDoc) => {
-      const updates: any = {};
-      if (firm.name) updates.firm_name = firm.name;
-      if (firm.logo_url) updates.firm_logo = firm.logo_url;
-      if (firm.slug) updates.firm_slug = firm.slug;
-      batch.update(challDoc.ref, updates);
-    });
+      // Cascade denormalized data updates to challenges, deals, and payouts
+      if (firm.name || firm.logo_url || firm.slug) {
+        const batch = writeBatch(db);
+        
+        // Updates challenges
+        const challsSnap = await getDocs(query(collection(db, 'challenges'), where('firm_id', '==', id)));
+        challsSnap.forEach((challDoc) => {
+          const updates: any = {};
+          if (firm.name) updates.firm_name = firm.name;
+          if (firm.logo_url) updates.firm_logo = firm.logo_url;
+          if (firm.slug) updates.firm_slug = firm.slug;
+          batch.update(challDoc.ref, updates);
+        });
 
-    // Updates deals
-    const dealsSnap = await getDocs(query(collection(db, 'deals'), where('firm_id', '==', id)));
-    dealsSnap.forEach((dealDoc) => {
-      const updates: any = {};
-      if (firm.name) updates.firm_name = firm.name;
-      if (firm.logo_url) updates.firm_logo = firm.logo_url;
-      if (firm.slug) updates.firm_slug = firm.slug;
-      batch.update(dealDoc.ref, updates);
-    });
+        // Updates deals
+        const dealsSnap = await getDocs(query(collection(db, 'deals'), where('firm_id', '==', id)));
+        dealsSnap.forEach((dealDoc) => {
+          const updates: any = {};
+          if (firm.name) updates.firm_name = firm.name;
+          if (firm.logo_url) updates.firm_logo = firm.logo_url;
+          if (firm.slug) updates.firm_slug = firm.slug;
+          batch.update(dealDoc.ref, updates);
+        });
 
-    await batch.commit();
+        await batch.commit();
+      }
+    } catch (err) {
+      console.error('Failed to update firm in Firestore:', err);
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    updateStoredFirm(id, firm);
   }
 }
 
 export async function deleteFirm(id: string): Promise<void> {
-  if (!db) return;
-  await deleteDoc(doc(db, 'firms', id));
-  
-  // Cascade delete challenges and deals
-  const batch = writeBatch(db);
-  const challsSnap = await getDocs(query(collection(db, 'challenges'), where('firm_id', '==', id)));
-  challsSnap.forEach(d => batch.delete(d.ref));
-  const dealsSnap = await getDocs(query(collection(db, 'deals'), where('firm_id', '==', id)));
-  dealsSnap.forEach(d => batch.delete(d.ref));
-  await batch.commit();
+  if (db) {
+    try {
+      await deleteDoc(doc(db, 'firms', id));
+      
+      // Cascade delete challenges and deals
+      const batch = writeBatch(db);
+      const challsSnap = await getDocs(query(collection(db, 'challenges'), where('firm_id', '==', id)));
+      challsSnap.forEach(d => batch.delete(d.ref));
+      const dealsSnap = await getDocs(query(collection(db, 'deals'), where('firm_id', '==', id)));
+      dealsSnap.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    } catch (err) {
+      console.error('Failed to delete firm from Firestore:', err);
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    deleteStoredFirm(id);
+  }
 }
 
 // ==========================================
@@ -281,10 +341,54 @@ export async function getDealsByFirm(firmId: string): Promise<Deal[]> {
 }
 
 export async function getReviewsByFirm(firmId: string): Promise<Review[]> {
-  if (!db) return [];
-  const colRef = collection(db, 'reviews');
-  const snap = await getDocs(query(colRef, where('firm_id', '==', firmId)));
-  return mapSnapshot<Review>(snap);
+  const isSlf = ['sure-leverage', 'sure-leverage-funding', 'slf'].includes(firmId.toLowerCase());
+  const localReviews = typeof window !== 'undefined' ? getStoredReviews() : MOCK_REVIEWS;
+  const filterMatches = (r: Review) => {
+    if (!r) return false;
+    const rId = (r.firm_id || '').toLowerCase();
+    const rName = (r.firm_name || '').toLowerCase();
+    if (rId === firmId.toLowerCase()) return true;
+    if (isSlf) {
+      return (
+        ['sure-leverage', 'sure-leverage-funding', 'slf'].includes(rId) ||
+        rName.includes('sure leverage') ||
+        rName.includes('slf')
+      );
+    }
+    return false;
+  };
+
+  if (!db) {
+    return localReviews.filter(filterMatches);
+  }
+
+  try {
+    const colRef = collection(db, 'reviews');
+    let snap;
+    if (isSlf) {
+      snap = await getDocs(query(colRef, where('firm_id', 'in', ['sure-leverage', 'sure-leverage-funding', 'slf'])));
+    } else {
+      snap = await getDocs(query(colRef, where('firm_id', '==', firmId)));
+    }
+    const firestoreReviews = mapSnapshot<Review>(snap);
+
+    const map = new Map<string, Review>();
+    localReviews.filter(filterMatches).forEach((r) => map.set(r.id, r));
+    firestoreReviews.forEach((r) => map.set(r.id, r));
+
+    if (isSlf) {
+      try {
+        const allSnap = await getDocs(colRef);
+        const all = mapSnapshot<Review>(allSnap);
+        all.filter(filterMatches).forEach((r) => map.set(r.id, r));
+      } catch (_) {}
+    }
+
+    return Array.from(map.values());
+  } catch (err) {
+    console.error('Failed to get reviews by firm from Firestore:', err);
+    return localReviews.filter(filterMatches);
+  }
 }
 
 export async function getPayoutsByFirm(firmId: string): Promise<Payout[]> {
@@ -560,36 +664,83 @@ export async function deletePayout(id: string): Promise<void> {
 // REVIEWS
 // ==========================================
 export async function getReviews(): Promise<Review[]> {
-  if (!db) return [];
-  const colRef = collection(db, 'reviews');
-  const snap = await getDocs(query(colRef, orderBy('created_at', 'desc')));
-  return mapSnapshot<Review>(snap);
+  const localReviews = typeof window !== 'undefined' ? getStoredReviews() : [];
+  if (!db) return localReviews;
+  try {
+    const colRef = collection(db, 'reviews');
+    const snap = await getDocs(query(colRef, orderBy('created_at', 'desc')));
+    const firestoreReviews = mapSnapshot<Review>(snap);
+    if (firestoreReviews && firestoreReviews.length > 0) {
+      if (typeof window !== 'undefined') {
+        saveStoredReviews(firestoreReviews);
+      }
+      return firestoreReviews;
+    }
+    return localReviews.length > 0 ? localReviews : MOCK_REVIEWS;
+  } catch (err) {
+    console.error('Failed to fetch reviews from Firestore:', err);
+    return localReviews.length > 0 ? localReviews : MOCK_REVIEWS;
+  }
 }
 
 export async function createReview(review: Omit<Review, 'id' | 'created_at'>): Promise<string> {
-  if (!db) throw new Error('Firestore not initialized');
-  const docRef = doc(collection(db, 'reviews'));
-  await setDoc(docRef, {
+  const id = `rev-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+  const created_at = new Date().toISOString().split('T')[0];
+  const fullReview: Review = {
     ...review,
-    id: docRef.id,
-    created_at: new Date().toISOString().split('T')[0],
-    updated_at: new Date().toISOString()
-  });
-  return docRef.id;
+    id,
+    created_at,
+  };
+
+  if (db) {
+    try {
+      const docRef = doc(db, 'reviews', id);
+      await setDoc(docRef, {
+        ...fullReview,
+        updated_at: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error('Failed to save review in Firestore:', err);
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    addStoredReview(fullReview);
+  }
+
+  return id;
 }
 
 export async function updateReview(id: string, review: Partial<Review>): Promise<void> {
-  if (!db) return;
-  const docRef = doc(db, 'reviews', id);
-  await updateDoc(docRef, {
-    ...review,
-    updated_at: new Date().toISOString()
-  });
+  if (db) {
+    try {
+      const docRef = doc(db, 'reviews', id);
+      await updateDoc(docRef, {
+        ...review,
+        updated_at: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error('Failed to update review in Firestore:', err);
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    updateStoredReview(id, review);
+  }
 }
 
 export async function deleteReview(id: string): Promise<void> {
-  if (!db) return;
-  await deleteDoc(doc(db, 'reviews', id));
+  if (db) {
+    try {
+      await deleteDoc(doc(db, 'reviews', id));
+    } catch (err) {
+      console.error('Failed to delete review in Firestore:', err);
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    deleteStoredReview(id);
+  }
 }
 
 export async function incrementReviewUpvotes(id: string): Promise<void> {

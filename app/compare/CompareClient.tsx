@@ -29,6 +29,9 @@ import { MOCK_FIRMS } from '@/lib/data/firms-data';
 import { MOCK_CHALLENGES } from '@/lib/data/challenges-data';
 import { Firm, Challenge, Review } from '@/lib/types';
 import { getFirms, getChallenges, getReviews } from '@/lib/firebase/services';
+import { getStoredFirms, saveStoredFirms } from '@/lib/utils/firms-store';
+import { getStoredChallenges, saveStoredChallenges } from '@/lib/utils/challenges-store';
+import { getStoredReviews, saveStoredReviews } from '@/lib/utils/reviews-store';
 import { calculateFirmMetrics } from '@/lib/utils/rating-calculator';
 import {
   calculateFirmComparisonScores,
@@ -81,10 +84,28 @@ export function CompareClient() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Db States
-  const [dbFirms, setDbFirms] = useState<Firm[]>([]);
-  const [dbChallenges, setDbChallenges] = useState<Challenge[]>([]);
-  const [dbReviews, setDbReviews] = useState<Review[]>([]);
+  // Db States initialized synchronously from local storage cache to eliminate flash of old data
+  const [dbFirms, setDbFirms] = useState<Firm[]>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = getStoredFirms();
+      if (stored && stored.length > 0) return stored;
+    }
+    return MOCK_FIRMS;
+  });
+  const [dbChallenges, setDbChallenges] = useState<Challenge[]>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = getStoredChallenges();
+      if (stored && stored.length > 0) return stored;
+    }
+    return MOCK_CHALLENGES;
+  });
+  const [dbReviews, setDbReviews] = useState<Review[]>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = getStoredReviews();
+      if (stored && stored.length > 0) return stored;
+    }
+    return [];
+  });
 
   useEffect(() => {
     async function loadCompareData() {
@@ -94,24 +115,22 @@ export function CompareClient() {
           getChallenges(),
           getReviews()
         ]);
-        const reviewsList = rData || [];
+        const reviewsList = rData && rData.length > 0 ? rData : getStoredReviews();
         setDbReviews(reviewsList);
+        saveStoredReviews(reviewsList);
+
         if (fData && fData.length > 0) {
           const syncedFirms = fData.map((f) => calculateFirmMetrics(f, reviewsList).firm);
           setDbFirms(syncedFirms);
-        } else {
-          const syncedMocks = MOCK_FIRMS.map((f) => calculateFirmMetrics(f, reviewsList).firm);
-          setDbFirms(syncedMocks);
+          saveStoredFirms(syncedFirms);
         }
+
         if (cData && cData.length > 0) {
           setDbChallenges(cData);
-        } else {
-          setDbChallenges(MOCK_CHALLENGES);
+          saveStoredChallenges(cData);
         }
       } catch (err) {
         console.error('Failed to load dynamic compare data:', err);
-        setDbFirms(MOCK_FIRMS);
-        setDbChallenges(MOCK_CHALLENGES);
       }
     }
     loadCompareData();
@@ -241,7 +260,7 @@ export function CompareClient() {
       }));
     } else {
       return selectedChallenges.map((ch, idx) => ({
-        firmName: `${ch.firm_name || ch.name || 'Prop Firm'} (${ch.steps === 0 ? 'Instant' : `${ch.steps || 2}-Step`})`,
+        firmName: `${ch.firm_name || 'Firm'} [${ch.steps === 0 ? 'Instant' : `${ch.steps || 2}-Step`}] $${ch.account_size >= 1000 ? `${(ch.account_size / 1000).toLocaleString('en-US')}K` : ch.account_size}`,
         color: SLOT_COLORS[idx % SLOT_COLORS.length],
         metrics: calculateChallengeComparisonScores(ch),
       }));
@@ -369,16 +388,24 @@ export function CompareClient() {
             ) : (
               selectedChallenges.map((ch, idx) => {
                 const slotColor = SLOT_COLORS[idx % SLOT_COLORS.length];
+                const modelBadge = ch.steps === 0 ? 'Instant' : `${ch.steps || 2}-Step`;
+                const sizeLabel = ch.account_size >= 1000 ? `$${(ch.account_size / 1000).toLocaleString('en-US')}K` : `$${ch.account_size}`;
                 return (
                   <div
                     key={ch.id}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white/90 dark:bg-zinc-900/90 text-xs font-bold text-foreground shadow-2xs"
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 text-xs font-bold text-foreground shadow-2xs"
                   >
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: slotColor }} />
                     <img src={ch.firm_logo || '/logos/nys.png'} alt={ch.firm_name} className="w-4 h-4 object-contain rounded" />
-                    <span className="truncate max-w-[140px] sm:max-w-[180px]">
-                      {ch.firm_name} (${ch.account_size.toLocaleString('en-US')})
-                    </span>
+                    <div className="flex items-center gap-1.5 truncate max-w-[200px] sm:max-w-[260px]">
+                      <span className="truncate font-extrabold text-foreground">{ch.firm_name}</span>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-tight bg-black text-white dark:bg-white dark:text-black shrink-0">
+                        {modelBadge}
+                      </span>
+                      <span className="font-mono text-muted-foreground font-semibold shrink-0">
+                        {sizeLabel}
+                      </span>
+                    </div>
                     {selectedChallenges.length > 1 && (
                       <button
                         type="button"
@@ -415,7 +442,7 @@ export function CompareClient() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 6 }}
                       transition={{ duration: 0.18 }}
-                      className="absolute left-0 top-full mt-2 w-72 sm:w-80 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-3 z-50 space-y-2"
+                      className="absolute left-0 top-full mt-2 w-72 sm:w-84 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-3 z-50 space-y-2"
                     >
                       <div className="relative">
                         <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-2.5" />
@@ -429,7 +456,7 @@ export function CompareClient() {
                         />
                       </div>
 
-                      <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
+                      <div className="max-h-60 overflow-y-auto space-y-1 pr-1">
                         {compareMode === 'firms' ? (
                           availableFirms.length > 0 ? (
                             availableFirms.map((f) => (
@@ -450,22 +477,40 @@ export function CompareClient() {
                             <p className="text-xs text-muted-foreground text-center py-4">No matching firms found.</p>
                           )
                         ) : availableChallenges.length > 0 ? (
-                          availableChallenges.map((ch) => (
-                            <button
-                              key={ch.id}
-                              type="button"
-                              onClick={() => handleAddChallenge(ch.id)}
-                              className="w-full flex items-center justify-between p-2 rounded-xl text-left text-xs hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors cursor-pointer"
-                            >
-                              <div className="flex items-center gap-2 truncate">
-                                <img src={ch.firm_logo || '/logos/nys.png'} alt={ch.firm_name} className="w-5 h-5 object-contain rounded" />
-                                <span className="font-semibold text-foreground truncate">
-                                  {ch.firm_name} (${ch.account_size.toLocaleString('en-US')})
-                                </span>
-                              </div>
-                              <span className="text-[10px] font-bold text-foreground">${ch.price}</span>
-                            </button>
-                          ))
+                          availableChallenges.map((ch) => {
+                            const modelLabel = ch.steps === 0 ? 'Instant Funding' : `${ch.steps || 2}-Step Evaluation`;
+                            const sizeLabel = ch.account_size >= 1000 ? `$${(ch.account_size / 1000).toLocaleString('en-US')}K` : `$${ch.account_size}`;
+                            return (
+                              <button
+                                key={ch.id}
+                                type="button"
+                                onClick={() => handleAddChallenge(ch.id)}
+                                className="w-full flex items-center justify-between p-2 rounded-xl text-left text-xs hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors cursor-pointer border-b border-zinc-100 dark:border-zinc-800/60 last:border-b-0"
+                              >
+                                <div className="flex items-center gap-2.5 truncate flex-1 min-w-0 mr-2">
+                                  <img
+                                    src={ch.firm_logo || '/logos/nys.png'}
+                                    alt={ch.firm_name}
+                                    className="w-6 h-6 object-contain rounded-md shrink-0 border border-zinc-200 dark:border-zinc-800 p-0.5 bg-white dark:bg-zinc-900"
+                                  />
+                                  <div className="truncate flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="font-extrabold text-foreground truncate">{ch.firm_name}</span>
+                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase tracking-tight bg-black text-white dark:bg-white dark:text-black shrink-0">
+                                        {ch.steps === 0 ? 'Instant' : `${ch.steps || 2}-Step`}
+                                      </span>
+                                    </div>
+                                    <div className="text-[11px] text-muted-foreground font-medium flex items-center gap-1 mt-0.5 truncate">
+                                      <span className="truncate">{ch.name || modelLabel}</span>
+                                      <span>•</span>
+                                      <span className="font-mono font-extrabold text-foreground">{sizeLabel}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <span className="text-xs font-extrabold text-foreground font-mono shrink-0">${ch.price}</span>
+                              </button>
+                            );
+                          })
                         ) : (
                           <p className="text-xs text-muted-foreground text-center py-4">No matching challenges found.</p>
                         )}
@@ -513,11 +558,11 @@ export function CompareClient() {
                   {radarData[0]?.metrics.map((metric, mIdx) => (
                     <div
                       key={mIdx}
-                      className="p-3 rounded-2xl bg-zinc-50/70 dark:bg-zinc-900/50 border border-zinc-200/60 dark:border-zinc-800/60 space-y-2"
+                      className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 space-y-2.5"
                     >
                       <div className="flex items-center justify-between text-xs">
-                        <span className="font-bold text-foreground">{metric.subject}</span>
-                        <span className="text-[10px] text-muted-foreground">
+                        <span className="font-extrabold text-foreground text-sm tracking-tight">{metric.subject}</span>
+                        <span className="text-[10px] text-muted-foreground font-semibold">
                           {metric.subject === 'Consistency'
                             ? '0 or No Rule = 100 (Best)'
                             : metric.subject === 'Min. Trading Days'
@@ -533,20 +578,20 @@ export function CompareClient() {
                           return (
                             <div
                               key={dIdx}
-                              className="p-2 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between text-xs"
+                              className="p-2.5 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs shadow-2xs"
                             >
-                              <div className="flex items-center gap-1.5 truncate mr-2">
-                                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
-                                <span className="font-semibold text-foreground truncate max-w-[110px]">
+                              <div className="flex items-center gap-2 truncate mr-2">
+                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+                                <span className="font-bold text-foreground truncate max-w-[120px]">
                                   {d.firmName}
                                 </span>
                               </div>
                               <div className="text-right shrink-0">
-                                <span className="font-extrabold text-foreground tracking-tight block">
+                                <span className="font-extrabold text-foreground text-sm tracking-tight block">
                                   {firmMetric.displayValue}
                                 </span>
-                                <span className="text-[10px] text-muted-foreground font-medium block">
-                                  Score: {firmMetric.score}/100
+                                <span className="text-[10px] text-muted-foreground font-semibold block">
+                                  Score: <strong className="text-foreground">{firmMetric.score}</strong>/100
                                 </span>
                               </div>
                             </div>
@@ -617,9 +662,19 @@ export function CompareClient() {
                               </div>
                               <div>
                                 <div className="flex items-center gap-1">
-                                  <span className="text-sm font-bold text-foreground">{firmName}</span>
+                                  <span className="text-sm font-extrabold text-foreground">{firmName}</span>
                                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                                 </div>
+                                {compareMode === 'challenges' && 'steps' in item && (
+                                  <div className="flex items-center gap-1 mt-0.5">
+                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase tracking-tight bg-black text-white dark:bg-white dark:text-black">
+                                      {(item as Challenge).steps === 0 ? 'Instant' : `${(item as Challenge).steps || 2}-Step`}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-foreground font-mono">
+                                      ${(item as Challenge).account_size.toLocaleString('en-US')}
+                                    </span>
+                                  </div>
+                                )}
                                 <div className="flex items-center gap-1.5 mt-0.5">
                                   <div className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">
                                     <Star className="w-2.5 h-2.5 fill-emerald-500 text-emerald-500" />
@@ -668,9 +723,16 @@ export function CompareClient() {
                           <div className="text-sm font-extrabold text-foreground tracking-tight">
                             ${ch.account_size.toLocaleString('en-US')}
                           </div>
-                          <span className="text-[11px] font-semibold text-muted-foreground block mt-0.5">
-                            {ch.steps === 0 ? 'Instant Funding' : `${ch.steps}-Step Evaluation`}
-                          </span>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-tight bg-black text-white dark:bg-white dark:text-black">
+                              {ch.steps === 0 ? 'Instant Funding' : `${ch.steps || 2}-Step Evaluation`}
+                            </span>
+                            {ch.name && (
+                              <span className="text-[11px] font-bold text-foreground">
+                                {ch.name}
+                              </span>
+                            )}
+                          </div>
                         </td>
                       ))}
                     </tr>
@@ -892,6 +954,69 @@ export function CompareClient() {
                               Algo: YES
                             </span>
                           </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+
+                  {/* Option 11: Risk Management (Max Risk & Inactivity) */}
+                  <tr>
+                    <td className="p-4 sm:p-5 font-bold text-foreground bg-zinc-50/40 dark:bg-zinc-900/30">
+                      Risk & Inactivity Rules
+                    </td>
+                    {(compareMode === 'firms' ? selectedFirms : selectedChallenges).map((item) => {
+                      const maxRisk = (item as any).max_risk_per_trade;
+                      const inactivity = (item as any).inactivity_period;
+                      return (
+                        <td key={item.id} className="p-4 sm:p-5 space-y-1">
+                          <div className="text-[11px] font-semibold text-foreground">
+                            Max Risk/Trade: <span className="font-extrabold text-foreground">{maxRisk || 'No Limit'}</span>
+                          </div>
+                          <div className="text-[11px] font-semibold text-foreground">
+                            Inactivity: <span className="font-extrabold text-foreground">{inactivity || '30 Days'}</span>
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+
+                  {/* Option 12: Dedicated Crypto Settings */}
+                  <tr>
+                    <td className="p-4 sm:p-5 font-bold text-foreground bg-zinc-50/40 dark:bg-zinc-900/30">
+                      Crypto Parameters
+                    </td>
+                    {(compareMode === 'firms' ? selectedFirms : selectedChallenges).map((item) => {
+                      const cryptoLev = (item as any).crypto_max_leverage || '1:5';
+                      const cryptoPos = (item as any).crypto_max_open_positions || 'No Limit';
+                      const cryptoExp = (item as any).crypto_total_notional_exposure || 'Standard';
+                      return (
+                        <td key={item.id} className="p-4 sm:p-5 space-y-1">
+                          <div className="text-[11px] font-semibold text-foreground">
+                            Max Leverage: <span className="font-extrabold text-foreground">{cryptoLev}</span>
+                          </div>
+                          <div className="text-[11px] font-semibold text-foreground">
+                            Max Open: <span className="font-bold text-foreground">{cryptoPos}</span>
+                          </div>
+                          <div className="text-[11px] font-semibold text-foreground">
+                            Exposure: <span className="font-bold text-foreground">{cryptoExp}</span>
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+
+                  {/* Option 13: Trading Leverage */}
+                  <tr>
+                    <td className="p-4 sm:p-5 font-bold text-foreground bg-zinc-50/40 dark:bg-zinc-900/30">
+                      Trading Leverage
+                    </td>
+                    {(compareMode === 'firms' ? selectedFirms : selectedChallenges).map((item) => {
+                      const lev = (item as any).leverage || '1:100';
+                      return (
+                        <td key={item.id} className="p-4 sm:p-5">
+                          <span className="inline-block px-2.5 py-1 rounded-md text-[11px] font-extrabold bg-zinc-100 dark:bg-zinc-900 text-foreground border border-zinc-200/80 dark:border-zinc-800">
+                            {lev}
+                          </span>
                         </td>
                       );
                     })}

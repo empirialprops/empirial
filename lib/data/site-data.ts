@@ -29,9 +29,8 @@ export interface PartnerLogo {
 export const PARTNER_LOGOS: PartnerLogo[] = [
   { name: 'NYS Capital', logo: '/logos/nys.png', badge: 'Dubai HQ' },
   { name: 'CK Capital', logo: '/logos/ck-capital.avif', badge: 'London HQ' },
-  { name: 'Alpha Capital', logo: '/logos/alpha-capital.png', badge: 'Singapore HQ' },
-  { name: 'FTMO', logo: '/logos/ftmo.svg', badge: 'Czech HQ' },
-  { name: 'Funding Pips', logo: '/logos/funding-pips.svg', badge: 'Dubai HQ' }
+  { name: 'Dolvero', logo: '/logos/dolvero.png', badge: 'Dubai HQ' },
+  { name: 'Shark Funded', logo: '/logos/shark.png', badge: 'St. Vincent HQ' }
 ];
 
 export interface Testimonial {

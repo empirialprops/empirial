@@ -41,7 +41,7 @@ export function PostCard({ post, currentUser, onPostUpdated }: PostCardProps) {
   const isFollowing = currentUser ? isUserFollowing(post.author_id, currentUser) : false;
   const hasUpvoted = currentUser ? post.upvoted_by.includes(currentUser.uid) : false;
   const hasDownvoted = currentUser ? post.downvoted_by.includes(currentUser.uid) : false;
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
 
   const handleVote = (type: 'up' | 'down') => {
     if (!currentUser) {

@@ -87,7 +87,7 @@ export interface UserProfile {
   email: string;
   displayName: string;
   phoneNumber: string;
-  role: 'admin' | 'trader';
+  role: 'admin' | 'super_admin' | 'data_entry' | 'reviews_support' | 'trader';
   avatarUrl?: string;
   traderId: string;
   points: number;

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Lock, Mail, ShieldCheck, UserCheck, Sparkles, ArrowRight, AlertCircle } from 'lucide-react';
-import { DEMO_ADMIN, DEMO_TRADER, UserProfile } from '@/lib/utils/auth-store';
+import { DEMO_TRADER, UserProfile } from '@/lib/utils/auth-store';
 import {
   loginWithGoogle,
   loginWithDiscord,
@@ -376,22 +376,14 @@ export function LoginModal() {
                 <Sparkles className="w-3 h-3 text-cyan-400" />
                 <span>Instant Demo Access</span>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => handleSuccessfulAuth(DEMO_TRADER)}
-                  className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 hover:bg-cyan-500/20 text-[11px] font-semibold transition-all"
-                >
-                  <UserCheck className="w-3 h-3" />
-                  <span>Demo Trader</span>
-                </button>
-                <button
-                  onClick={() => handleSuccessfulAuth(DEMO_ADMIN)}
-                  className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/20 text-[11px] font-semibold transition-all"
-                >
-                  <ShieldCheck className="w-3 h-3" />
-                  <span>Admin Mode</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => handleSuccessfulAuth(DEMO_TRADER)}
+                className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 hover:bg-cyan-500/20 text-[11px] font-semibold transition-all cursor-pointer"
+              >
+                <UserCheck className="w-3 h-3" />
+                <span>Demo Trader</span>
+              </button>
             </div>
 
             {/* Footer Toggle */}

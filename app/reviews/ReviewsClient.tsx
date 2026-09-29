@@ -24,6 +24,8 @@ import { MOCK_FIRMS } from '@/lib/data/firms-data';
 import { Review, Firm } from '@/lib/types';
 import { getStoredUser, openAuthModal } from '@/lib/utils/auth-store';
 import { getReviews, getFirms, createReview } from '@/lib/firebase/services';
+import { getStoredReviews, saveStoredReviews } from '@/lib/utils/reviews-store';
+import { getStoredFirms, saveStoredFirms } from '@/lib/utils/firms-store';
 import { calculateFirmMetrics } from '@/lib/utils/rating-calculator';
 import {
   Tooltip,
@@ -33,8 +35,20 @@ import {
 } from '@/components/ui/tooltip';
 
 export function ReviewsClient() {
-  const [reviewsList, setReviewsList] = useState<Review[]>([]);
-  const [firmsList, setFirmsList] = useState<Firm[]>([]);
+  const [reviewsList, setReviewsList] = useState<Review[]>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = getStoredReviews();
+      if (stored && stored.length > 0) return stored;
+    }
+    return MOCK_REVIEWS;
+  });
+  const [firmsList, setFirmsList] = useState<Firm[]>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = getStoredFirms();
+      if (stored && stored.length > 0) return stored;
+    }
+    return MOCK_FIRMS;
+  });
   const [selectedFirmSlugs, setSelectedFirmSlugs] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [hoveredFirmId, setHoveredFirmId] = useState<string | null>(null);
@@ -79,20 +93,20 @@ export function ReviewsClient() {
         if (revs && revs.length > 0) {
           const uniqueRevs = Array.from(new Map(revs.map((r) => [r.id, r])).values());
           setReviewsList(uniqueRevs);
+          saveStoredReviews(uniqueRevs);
         } else {
-          setReviewsList(MOCK_REVIEWS);
+          setReviewsList((prev) => (prev.length > 0 ? prev : MOCK_REVIEWS));
         }
 
         if (fms && fms.length > 0) {
           const uniqueFirms = Array.from(new Map(fms.map((f) => [f.id || f.slug, f])).values());
           setFirmsList(uniqueFirms);
+          saveStoredFirms(uniqueFirms);
         } else {
-          setFirmsList(MOCK_FIRMS);
+          setFirmsList((prev) => (prev.length > 0 ? prev : MOCK_FIRMS));
         }
       } catch (err) {
         console.error('Failed to load reviews dynamic data:', err);
-        setReviewsList(MOCK_REVIEWS);
-        setFirmsList(MOCK_FIRMS);
       } finally {
         setLoading(false);
       }
@@ -894,7 +908,7 @@ export function ReviewsClient() {
                       <Check className="w-6 h-6" />
                     </div>
                     <h4 className="text-base font-bold text-foreground">Review Submitted!</h4>
-                    <p className="text-xs text-muted-foreground">+300 community loyalty points added.</p>
+                    <p className="text-xs text-muted-foreground">Thank you for sharing your authentic feedback with the community.</p>
                   </div>
                 ) : (
                   <form onSubmit={handleSubmitReview} className="space-y-4">

@@ -24,6 +24,7 @@ import {
   UserCheck,
   Lock,
   History,
+  Sparkles,
 } from 'lucide-react';
 
 interface AdminNavItem {
@@ -145,7 +146,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Media Library', href: '/admin/media', icon: ImageIcon, roles: ['admin', 'super_admin'] },
     { name: 'Staff & Role Profiles', href: '/admin/roles', icon: UserCheck, roles: ['admin', 'super_admin'] },
     { name: 'Audit Logs & Undo', href: '/admin/logs', icon: History, roles: ['admin', 'super_admin'] },
-    { name: 'System Settings', href: '/admin/settings', icon: Settings, roles: ['admin', 'super_admin', 'data_entry'] },
+    { name: 'State Hall & Social', href: '/admin/social', icon: Sparkles, roles: ['admin', 'super_admin', 'reviews_support'] },
+    { name: 'System Settings', href: '/admin/settings', icon: Settings, roles: ['admin', 'super_admin', 'data_entry', 'reviews_support'] },
   ];
 
   const userRole = currentUser?.role || 'admin';

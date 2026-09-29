@@ -86,8 +86,26 @@ export default async function FirmProfilePage({ params }: PageProps) {
   if (firmDeals.length === 0) {
     firmDeals = MOCK_DEALS.filter((d) => d.firm_slug === firm!.slug || d.firm_id === firm!.id);
   }
+  const isSlf =
+    ['sure-leverage', 'sure-leverage-funding', 'slf'].includes(firm.id.toLowerCase()) ||
+    ['sure-leverage', 'sure-leverage-funding', 'slf'].includes(firm.slug.toLowerCase()) ||
+    firm.name.toLowerCase().includes('sure leverage') ||
+    firm.name.toLowerCase().includes('slf');
+
   if (firmReviews.length === 0) {
-    firmReviews = MOCK_REVIEWS.filter((r) => r.firm_id === firm!.id);
+    firmReviews = MOCK_REVIEWS.filter((r) => {
+      if (r.firm_id === firm!.id) return true;
+      if (isSlf) {
+        const rId = (r.firm_id || '').toLowerCase();
+        const rName = (r.firm_name || '').toLowerCase();
+        return (
+          ['sure-leverage', 'sure-leverage-funding', 'slf'].includes(rId) ||
+          rName.includes('sure leverage') ||
+          rName.includes('slf')
+        );
+      }
+      return false;
+    });
   }
   if (firmPayouts.length === 0) {
     firmPayouts = MOCK_PAYOUTS.filter((p) => p.firm_id === firm!.id);

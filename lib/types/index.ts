@@ -33,8 +33,14 @@ export interface Firm {
   profit_target_pct?: number;
   min_price?: number;
   consistency_rules_content?: string;
+  consistency_rule?: string;
+  payout_cycle?: string;
+  payout_split_pct?: number | string;
+  leverage?: string;
+  firm_types?: string[];
   firm_rules_content?: string;
   restricted_countries?: string[];
+  restricted_jurisdictions?: string[];
   payout_programs?: Array<{ name: string; schedule: string; split: string }>;
   description?: string;
 }
@@ -70,6 +76,11 @@ export interface Challenge {
   review_count?: number;
   avg_payout?: string;
   consistency_rule?: string;
+  max_risk_per_trade?: string;
+  inactivity_period?: string;
+  crypto_max_leverage?: string;
+  crypto_max_open_positions?: string;
+  crypto_total_notional_exposure?: string;
   news_trading?: string;
   overnight_weekend?: string;
   loss_type?: 'Trailing' | 'Static';

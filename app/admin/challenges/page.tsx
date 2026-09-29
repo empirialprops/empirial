@@ -86,6 +86,11 @@ export default function AdminChallengesPage() {
     rating: 4.9,
     review_count: 1200,
     consistency_rule: 'No Consistency Rule',
+    max_risk_per_trade: '2% / Trade',
+    inactivity_period: '30 Days',
+    crypto_max_leverage: '1:5',
+    crypto_max_open_positions: '5 Positions',
+    crypto_total_notional_exposure: '$250,000',
     news_trading: 'YES / Allowed',
     overnight_weekend: 'YES | YES',
     loss_type: 'Static',
@@ -175,6 +180,11 @@ export default function AdminChallengesPage() {
       rating: defaultFirm.rating || 4.9,
       review_count: defaultFirm.review_count || 1200,
       consistency_rule: 'No Consistency Rule',
+      max_risk_per_trade: '2% / Trade',
+      inactivity_period: '30 Days',
+      crypto_max_leverage: '1:5',
+      crypto_max_open_positions: '5 Positions',
+      crypto_total_notional_exposure: '$250,000',
       news_trading: 'YES / Allowed',
       overnight_weekend: 'YES | YES',
       loss_type: 'Static',
@@ -328,6 +338,11 @@ export default function AdminChallengesPage() {
       rating: parseNum(formData.rating, selectedFirm?.rating || 4.9),
       review_count: parseNum(formData.review_count, selectedFirm?.review_count || 1200),
       consistency_rule: formData.consistency_rule || 'No Consistency Rule',
+      max_risk_per_trade: formData.max_risk_per_trade || '2% / Trade',
+      inactivity_period: formData.inactivity_period || '30 Days',
+      crypto_max_leverage: formData.crypto_max_leverage || '1:5',
+      crypto_max_open_positions: formData.crypto_max_open_positions || '5 Positions',
+      crypto_total_notional_exposure: formData.crypto_total_notional_exposure || '$250,000',
       news_trading: formData.news_trading || 'YES / Allowed',
       overnight_weekend: formData.overnight_weekend || 'YES | YES',
       loss_type: formData.loss_type || 'Static',
@@ -706,7 +721,32 @@ export default function AdminChallengesPage() {
                             {ch.min_trading_days === 0 ? '0 Days (No Min)' : `${ch.min_trading_days} Days`}
                           </span>
                         </div>
+                        <div>
+                          <span className="text-[10px] uppercase font-semibold text-muted-foreground block">Max Risk / Trade</span>
+                          <span className="font-semibold text-foreground font-mono">{ch.max_risk_per_trade || '2% / Trade'}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] uppercase font-semibold text-muted-foreground block">Inactivity Period</span>
+                          <span className="font-semibold text-foreground font-mono">{ch.inactivity_period || '30 Days'}</span>
+                        </div>
                       </div>
+
+                      {ch.category === 'crypto' && (
+                        <div className="mt-2.5 p-2 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-[11px] grid grid-cols-3 gap-2 text-center">
+                          <div>
+                            <span className="text-[9px] uppercase font-bold text-muted-foreground block">Max Lev</span>
+                            <span className="font-bold text-foreground font-mono">{ch.crypto_max_leverage || '1:5'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[9px] uppercase font-bold text-muted-foreground block">Max Pos</span>
+                            <span className="font-bold text-foreground font-mono">{ch.crypto_max_open_positions || '5'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[9px] uppercase font-bold text-muted-foreground block">Notional Exp</span>
+                            <span className="font-bold text-foreground font-mono">{ch.crypto_total_notional_exposure || '$250K'}</span>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Promo Code Info */}
                       <div className="mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-xs">
@@ -1177,6 +1217,79 @@ export default function AdminChallengesPage() {
                   onChange={(e) => setFormData({ ...formData, consistency_rule: e.target.value })}
                   className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-none focus:border-foreground"
                 />
+              </div>
+
+              {/* Advanced Challenge Rules */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Max Risk Per Trade</label>
+                <input
+                  type="text"
+                  value={formData.max_risk_per_trade || '2% / Trade'}
+                  onChange={(e) => setFormData({ ...formData, max_risk_per_trade: e.target.value })}
+                  placeholder="e.g. 2% / Trade, or No Limit"
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-none focus:border-foreground font-mono"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Inactivity Period</label>
+                <input
+                  type="text"
+                  value={formData.inactivity_period || '30 Days'}
+                  onChange={(e) => setFormData({ ...formData, inactivity_period: e.target.value })}
+                  placeholder="e.g. 30 Days, 60 Days, or Unlimited"
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-none focus:border-foreground font-mono"
+                />
+              </div>
+
+              {/* Dedicated Crypto Challenges Settings */}
+              <div className="space-y-3 md:col-span-2 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-black text-white dark:bg-white dark:text-black text-[10px] font-bold">
+                      ₿
+                    </span>
+                    <span className="font-bold text-xs text-foreground uppercase tracking-tight">
+                      Dedicated Crypto Challenges Settings
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground font-medium">Applied to crypto & multi-asset challenges</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-foreground block">MAX Leverage</label>
+                    <input
+                      type="text"
+                      value={formData.crypto_max_leverage || '1:5'}
+                      onChange={(e) => setFormData({ ...formData, crypto_max_leverage: e.target.value })}
+                      placeholder="e.g. 1:5, 1:10"
+                      className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-border rounded-xl px-3 py-1.5 text-xs font-mono font-bold text-foreground focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-foreground block">Max Open Positions</label>
+                    <input
+                      type="text"
+                      value={formData.crypto_max_open_positions || '5 Positions'}
+                      onChange={(e) => setFormData({ ...formData, crypto_max_open_positions: e.target.value })}
+                      placeholder="e.g. 5 Positions, No Limit"
+                      className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-border rounded-xl px-3 py-1.5 text-xs font-mono font-bold text-foreground focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-foreground block">Total Notional Exposure</label>
+                    <input
+                      type="text"
+                      value={formData.crypto_total_notional_exposure || '$250,000'}
+                      onChange={(e) => setFormData({ ...formData, crypto_total_notional_exposure: e.target.value })}
+                      placeholder="e.g. $250,000 or 100% Capital"
+                      className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-border rounded-xl px-3 py-1.5 text-xs font-mono font-bold text-foreground focus:outline-none"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Toggles */}

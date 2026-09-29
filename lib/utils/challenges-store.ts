@@ -12,10 +12,20 @@ export function getStoredChallenges(): Challenge[] {
     const isInit = localStorage.getItem(INITIALIZED_KEY);
     const raw = localStorage.getItem(STORAGE_KEY);
 
-    if (isInit === 'true') {
-      if (!raw) return [];
-      const parsed: Challenge[] = JSON.parse(raw);
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed : MOCK_CHALLENGES;
+    if (isInit === 'true' && raw) {
+      let parsed: Challenge[] = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Strip out unadded default firms
+        parsed = parsed.filter(c => c.firm_id !== 'ftmo' && c.firm_id !== 'funding-pips' && c.id !== 'ch-ftmo-100k' && c.id !== 'ch-pips-100k');
+        
+        // Ensure authentic MOCK_CHALLENGES (e.g. dolvero) exist if not present
+        const existingIds = new Set(parsed.map(c => c.id));
+        const missingMocks = MOCK_CHALLENGES.filter(m => !existingIds.has(m.id));
+        if (missingMocks.length > 0) {
+          parsed = [...parsed, ...missingMocks];
+        }
+        return parsed;
+      }
     }
 
     localStorage.setItem(INITIALIZED_KEY, 'true');

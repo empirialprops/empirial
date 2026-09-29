@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -20,6 +20,10 @@ import {
   Layers,
   Copy,
   Check,
+  ChevronDown,
+  ChevronUp,
+  Zap,
+  HelpCircle,
 } from 'lucide-react';
 import {
   Tooltip,
@@ -29,6 +33,8 @@ import {
 } from '@/components/ui/tooltip';
 import { Firm, Challenge, Deal, Review, Payout } from '@/lib/types';
 import { calculateFirmMetrics } from '@/lib/utils/rating-calculator';
+import { getStoredChallenges } from '@/lib/utils/challenges-store';
+import { getStoredReviews } from '@/lib/utils/reviews-store';
 
 // Platform Logo Dictionary from downloaded assets
 const PLATFORM_DATA: Record<string, { name: string; logo: string; type: 'forex' | 'futures' }> = {
@@ -62,6 +68,66 @@ export function FirmProfileClient({
 }: FirmProfileClientProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'challenges' | 'offers' | 'reviews'>('overview');
   const [copiedCode, setCopiedCode] = useState(false);
+  const [expandedChallengeId, setExpandedChallengeId] = useState<string | null>(null);
+  const [selectedSizeFilter, setSelectedSizeFilter] = useState<number | 'all'>('all');
+  const [selectedStepFilter, setSelectedStepFilter] = useState<number | 'all'>('all');
+
+  const isSlf =
+    ['sure-leverage', 'sure-leverage-funding', 'slf'].includes(firm.id.toLowerCase()) ||
+    ['sure-leverage', 'sure-leverage-funding', 'slf'].includes((firm.slug || '').toLowerCase()) ||
+    firm.name.toLowerCase().includes('sure leverage') ||
+    firm.name.toLowerCase().includes('slf');
+
+  const [effectiveChallenges, setEffectiveChallenges] = useState<Challenge[]>(firmChallenges);
+  const [effectiveReviews, setEffectiveReviews] = useState<Review[]>(firmReviews);
+
+  useEffect(() => {
+    // 1. Sync stored challenges for this firm
+    const storedCh = getStoredChallenges();
+    const matchingStoredCh = storedCh.filter((c) => {
+      if (c.firm_id === firm.id || c.firm_slug === firm.slug) return true;
+      if (isSlf) {
+        const cFId = (c.firm_id || '').toLowerCase();
+        const cSlug = (c.firm_slug || '').toLowerCase();
+        return ['sure-leverage', 'sure-leverage-funding', 'slf'].includes(cFId) || ['sure-leverage', 'sure-leverage-funding', 'slf'].includes(cSlug);
+      }
+      return false;
+    });
+
+    if (matchingStoredCh.length > 0) {
+      const chMap = new Map<string, Challenge>();
+      firmChallenges.forEach((c) => chMap.set(c.id, c));
+      matchingStoredCh.forEach((c) => chMap.set(c.id, c));
+      setEffectiveChallenges(Array.from(chMap.values()));
+    } else {
+      setEffectiveChallenges(firmChallenges);
+    }
+
+    // 2. Sync stored reviews (especially SLF reviews)
+    const storedRev = getStoredReviews();
+    const matchingStoredRev = storedRev.filter((r) => {
+      const rId = (r.firm_id || '').toLowerCase();
+      const rName = (r.firm_name || '').toLowerCase();
+      if (rId === firm.id.toLowerCase() || rId === (firm.slug || '').toLowerCase()) return true;
+      if (isSlf) {
+        return (
+          ['sure-leverage', 'sure-leverage-funding', 'slf'].includes(rId) ||
+          rName.includes('sure leverage') ||
+          rName.includes('slf')
+        );
+      }
+      return false;
+    });
+
+    if (matchingStoredRev.length > 0) {
+      const revMap = new Map<string, Review>();
+      firmReviews.forEach((r) => revMap.set(r.id, r));
+      matchingStoredRev.forEach((r) => revMap.set(r.id, r));
+      setEffectiveReviews(Array.from(revMap.values()));
+    } else {
+      setEffectiveReviews(firmReviews);
+    }
+  }, [firm.id, firm.slug, isSlf, firmChallenges, firmReviews]);
 
   const handleCopyCode = (code: string) => {
     if (typeof navigator !== 'undefined') {
@@ -72,7 +138,7 @@ export function FirmProfileClient({
   };
 
   // Genuine Synced Rating metrics calculations
-  const metrics = calculateFirmMetrics(firm, firmReviews);
+  const metrics = calculateFirmMetrics(firm, effectiveReviews);
   const totalReviewsCount = metrics.reviewCount;
   const computedRating = metrics.rating;
 
@@ -276,10 +342,10 @@ export function FirmProfileClient({
               </div>
             </div>
 
-            {/* Evaluation Models Pills */}
+            {/* Evaluation Models & Firm Types Pills */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
               <div className="flex items-center gap-2 flex-wrap text-xs">
-                <span className="text-muted-foreground font-semibold">Evaluation Models:</span>
+                <span className="text-muted-foreground font-semibold">Models:</span>
                 {(firm.models || ['1-Step Challenge', '2-Step Evaluation', 'Instant Model']).map((model) => (
                   <span
                     key={model}
@@ -288,10 +354,36 @@ export function FirmProfileClient({
                     {model}
                   </span>
                 ))}
+
+                {(firm.firm_types && firm.firm_types.length > 0) && (
+                  <>
+                    <span className="text-muted-foreground font-semibold ml-2">Types:</span>
+                    {firm.firm_types.map((ft) => (
+                      <span
+                        key={ft}
+                        className="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-black text-white dark:bg-white dark:text-black"
+                      >
+                        {ft}
+                      </span>
+                    ))}
+                  </>
+                )}
               </div>
 
-              <div className="text-xs text-muted-foreground font-medium">
-                Max Allocation: <strong className="text-foreground font-bold">{firm.max_allocation}</strong> (Profit Split {firm.profit_split_custom})
+              <div className="text-xs text-muted-foreground font-medium flex items-center gap-3">
+                <span>Max Alloc: <strong className="text-foreground font-bold">{firm.max_allocation}</strong></span>
+                <span>Split: <strong className="text-foreground font-bold">{firm.payout_split_pct ? `${firm.payout_split_pct}%` : firm.profit_split_custom}</strong></span>
+                <span>Lev: <strong className="text-foreground font-bold">{firm.leverage || '1:100'}</strong></span>
+              </div>
+            </div>
+
+            {/* Firm Specs Bar */}
+            <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+              <div>
+                <span>Consistency Rule: <strong className="text-foreground font-semibold">{firm.consistency_rule || firm.consistency_rules_content || 'No strict consistency rule'}</strong></span>
+              </div>
+              <div>
+                <span>Payout Cycle: <strong className="text-foreground font-semibold">{firm.payout_cycle || firm.payout_custom || 'Bi-Weekly / 14 Days'}</strong></span>
               </div>
             </div>
           </div>
@@ -300,9 +392,9 @@ export function FirmProfileClient({
           <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-3 overflow-x-auto no-scrollbar">
             {[
               { id: 'overview', label: 'Rules & Specs Overview' },
-              { id: 'challenges', label: `Challenges (${firmChallenges.length})` },
+              { id: 'challenges', label: `Challenges (${effectiveChallenges.length})` },
               { id: 'offers', label: `Promo Deals (${firmDeals.length})` },
-              { id: 'reviews', label: `Verified Reviews (${firmReviews.length})` },
+              { id: 'reviews', label: `Verified Reviews (${effectiveReviews.length})` },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -421,56 +513,304 @@ export function FirmProfileClient({
             </div>
           )}
 
-          {/* Tab 2: Challenges */}
+          {/* Tab 2: Challenges (Full Detailed Table View matching Challenges directory) */}
           {activeTab === 'challenges' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {firmChallenges.map((ch) => (
-                <div key={ch.id} className="bg-white dark:bg-card border border-zinc-200 dark:border-border rounded-2xl p-6 space-y-4 shadow-xs">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">
-                        ${(ch.account_size / 1000).toFixed(0)}K Account
-                      </span>
-                      <h3 className="text-lg font-extrabold text-foreground">{ch.name}</h3>
-                    </div>
-                    <span className="px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-zinc-900 text-xs font-mono font-bold text-foreground border border-zinc-200 dark:border-zinc-800">
-                      {ch.steps === 0 ? 'Instant' : `${ch.steps}-Step`}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-center">
-                    <div className="border-r border-zinc-200 dark:border-zinc-800">
-                      <span className="text-[10px] text-muted-foreground uppercase font-bold block">Profit Split</span>
-                      <span className="font-mono font-extrabold text-emerald-600 dark:text-emerald-400 text-sm">{ch.profit_split_pct}%</span>
-                    </div>
-                    <div className="border-r border-zinc-200 dark:border-zinc-800">
-                      <span className="text-[10px] text-muted-foreground uppercase font-bold block">Max Loss</span>
-                      <span className="font-mono font-extrabold text-rose-500 text-sm">{ch.max_loss_limit_pct}%</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-muted-foreground uppercase font-bold block">Target</span>
-                      <span className="font-mono font-extrabold text-foreground text-sm">{ch.profit_target_pct}%</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-2 border-t border-zinc-100 dark:border-zinc-800">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-lg font-black text-foreground">${ch.price}</span>
-                      {ch.original_price && ch.original_price > ch.price && (
-                        <span className="text-xs text-muted-foreground line-through">${ch.original_price}</span>
-                      )}
-                    </div>
-                    <a
-                      href={ch.buy_url || firm.buy_url || '#'}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-4 py-2 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 font-semibold text-xs transition-all cursor-pointer shadow-xs"
+            <div className="space-y-4">
+              {/* Filter Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-white dark:bg-card border border-zinc-200 dark:border-border">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs font-semibold text-muted-foreground mr-1">Size:</span>
+                  {[
+                    { label: 'All', val: 'all' },
+                    { label: '$5K', val: 5000 },
+                    { label: '$10K', val: 10000 },
+                    { label: '$25K', val: 25000 },
+                    { label: '$50K', val: 50000 },
+                    { label: '$100K', val: 100000 },
+                    { label: '$200K', val: 200000 },
+                  ].map((s) => (
+                    <button
+                      key={s.label}
+                      type="button"
+                      onClick={() => setSelectedSizeFilter(s.val as any)}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        selectedSizeFilter === s.val
+                          ? 'bg-black text-white dark:bg-white dark:text-black font-bold'
+                          : 'bg-zinc-100 hover:bg-zinc-200 text-muted-foreground dark:bg-zinc-900 dark:hover:bg-zinc-800'
+                      }`}
                     >
-                      Buy Challenge
-                    </a>
-                  </div>
+                      {s.label}
+                    </button>
+                  ))}
                 </div>
-              ))}
+
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-muted-foreground mr-1">Steps:</span>
+                  {[
+                    { label: 'All', val: 'all' },
+                    { label: 'Instant', val: 0 },
+                    { label: '1-Step', val: 1 },
+                    { label: '2-Step', val: 2 },
+                  ].map((m) => (
+                    <button
+                      key={m.label}
+                      type="button"
+                      onClick={() => setSelectedStepFilter(m.val as any)}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        selectedStepFilter === m.val
+                          ? 'bg-black text-white dark:bg-white dark:text-black font-bold'
+                          : 'bg-zinc-100 hover:bg-zinc-200 text-muted-foreground dark:bg-zinc-900 dark:hover:bg-zinc-800'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Table Header (Desktop) */}
+              <div className="hidden lg:grid grid-cols-12 gap-3 px-6 py-2.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider items-center">
+                <div className="col-span-3">CHALLENGE & MODEL</div>
+                <div className="col-span-2 text-center">ACCOUNT SIZE</div>
+                <div className="col-span-2 text-center">PROFIT TARGET</div>
+                <div className="col-span-1 text-center">DAILY / MAX DD</div>
+                <div className="col-span-1 text-center">PROFIT SPLIT</div>
+                <div className="col-span-3 text-right">PRICE & BUY</div>
+              </div>
+
+              {/* Rows List */}
+              <div className="space-y-3">
+                {effectiveChallenges
+                  .filter((ch) => {
+                    const matchSize = selectedSizeFilter === 'all' || ch.account_size === selectedSizeFilter;
+                    const matchStep = selectedStepFilter === 'all' || ch.steps === selectedStepFilter;
+                    return matchSize && matchStep;
+                  })
+                  .map((ch) => {
+                    const isExpanded = expandedChallengeId === ch.id;
+                    const originalPrice = ch.original_price || Math.round(ch.price * 1.25);
+                    const targetStr =
+                      ch.steps === 2 && ch.phase_2_target_pct && ch.phase_2_target_pct > 0
+                        ? `${ch.profit_target_pct ?? 0}% | ${ch.phase_2_target_pct}%`
+                        : ch.steps === 0
+                        ? 'None (Instant)'
+                        : `${ch.profit_target_pct ?? 0}%`;
+                    const ddStr = `${ch.daily_loss_limit_pct ? ch.daily_loss_limit_pct + '%' : 'None'} | ${ch.max_loss_limit_pct ?? 10}%`;
+
+                    return (
+                      <div
+                        key={ch.id}
+                        className={`rounded-2xl transition-all duration-200 border bg-white dark:bg-card overflow-hidden shadow-xs ${
+                          isExpanded
+                            ? 'border-black dark:border-white shadow-md'
+                            : 'border-zinc-200 dark:border-border hover:border-zinc-400 dark:hover:border-zinc-700'
+                        }`}
+                      >
+                        {/* Main Row */}
+                        <div
+                          onClick={() => setExpandedChallengeId(isExpanded ? null : ch.id)}
+                          className="p-4 sm:p-5 cursor-pointer"
+                        >
+                          {/* Desktop Grid */}
+                          <div className="hidden lg:grid grid-cols-12 gap-3 items-center">
+                            <div className="col-span-3">
+                              <div className="flex items-center gap-2">
+                                <span className="font-extrabold text-sm text-foreground hover:underline">
+                                  {ch.name}
+                                </span>
+                                {ch.is_best_seller && (
+                                  <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-black text-white dark:bg-white dark:text-black">
+                                    BEST SELLER
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                                <span className="font-semibold text-foreground">
+                                  {ch.steps === 0 ? 'Instant Funding' : `${ch.steps}-Step Evaluation`}
+                                </span>
+                                <span>•</span>
+                                <span className="capitalize">{ch.category || 'Forex'}</span>
+                              </div>
+                            </div>
+
+                            <div className="col-span-2 text-center">
+                              <span className="font-mono font-extrabold text-base text-foreground">
+                                ${ch.account_size.toLocaleString('en-US')}
+                              </span>
+                            </div>
+
+                            <div className="col-span-2 text-center">
+                              <span className="font-mono font-bold text-sm text-foreground">{targetStr}</span>
+                            </div>
+
+                            <div className="col-span-1 text-center">
+                              <span className="font-mono font-bold text-sm text-foreground">{ddStr}</span>
+                            </div>
+
+                            <div className="col-span-1 text-center">
+                              <span className="font-mono font-extrabold text-sm text-foreground">
+                                {ch.profit_split_pct}%
+                              </span>
+                            </div>
+
+                            <div className="col-span-3 flex items-center justify-end gap-3" onClick={(e) => e.stopPropagation()}>
+                              <div className="text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <span className="font-mono font-extrabold text-base text-foreground">
+                                    ${ch.price}
+                                  </span>
+                                  {originalPrice > ch.price && (
+                                    <span className="text-[11px] font-mono text-muted-foreground line-through">
+                                      ${originalPrice}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] font-bold text-muted-foreground">
+                                  Code: <span className="font-mono text-foreground font-extrabold">{ch.coupon_code || 'EMPIRE'}</span>
+                                </span>
+                              </div>
+
+                              <a
+                                href={ch.buy_url || firm.buy_url || '#'}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-4 py-2 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-semibold transition-all shadow-xs shrink-0 cursor-pointer"
+                              >
+                                Buy Challenge
+                              </a>
+
+                              <button
+                                type="button"
+                                onClick={() => setExpandedChallengeId(isExpanded ? null : ch.id)}
+                                className="p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                              >
+                                {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Mobile View */}
+                          <div className="lg:hidden space-y-3">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <span className="text-xs font-bold text-muted-foreground block">
+                                  ${(ch.account_size / 1000).toFixed(0)}K Account
+                                </span>
+                                <h3 className="font-bold text-foreground text-sm">{ch.name}</h3>
+                              </div>
+                              <span className="px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-zinc-900 text-xs font-mono font-bold text-foreground">
+                                {ch.steps === 0 ? 'Instant' : `${ch.steps}-Step`}
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-900 text-center text-xs">
+                              <div>
+                                <span className="text-[10px] text-muted-foreground block">Target</span>
+                                <span className="font-bold text-foreground">{targetStr}</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-muted-foreground block">Max DD</span>
+                                <span className="font-bold text-foreground">{ch.max_loss_limit_pct}%</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-muted-foreground block">Split</span>
+                                <span className="font-bold text-foreground">{ch.profit_split_pct}%</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                              <div>
+                                <span className="text-base font-extrabold text-foreground">${ch.price}</span>
+                                {originalPrice > ch.price && (
+                                  <span className="text-xs text-muted-foreground line-through ml-1">${originalPrice}</span>
+                                )}
+                              </div>
+                              <a
+                                href={ch.buy_url || firm.buy_url || '#'}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-4 py-1.5 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black text-xs font-semibold"
+                              >
+                                Buy Challenge
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Expandable Rules Drawer */}
+                        {isExpanded && (
+                          <div className="px-5 pb-5 pt-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 text-xs space-y-4 animate-in fade-in duration-150">
+                            <div>
+                              <h4 className="font-bold text-foreground text-xs uppercase tracking-tight mb-2">
+                                Account Rules & Trading Parameters
+                              </h4>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-muted-foreground">
+                                <div>
+                                  <span className="text-[10px] uppercase font-semibold text-muted-foreground block">Consistency Rule</span>
+                                  <strong className="text-foreground">{ch.consistency_rule || 'No Consistency Rule'}</strong>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] uppercase font-semibold text-muted-foreground block">Max Risk / Trade</span>
+                                  <strong className="text-foreground font-mono">{ch.max_risk_per_trade || '2% / Trade'}</strong>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] uppercase font-semibold text-muted-foreground block">Inactivity Period</span>
+                                  <strong className="text-foreground font-mono">{ch.inactivity_period || '30 Days'}</strong>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] uppercase font-semibold text-muted-foreground block">Leverage</span>
+                                  <strong className="text-foreground font-mono">{ch.leverage || '1:100'}</strong>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] uppercase font-semibold text-muted-foreground block">News Trading</span>
+                                  <strong className="text-foreground">{ch.news_trading || 'YES / Allowed'}</strong>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] uppercase font-semibold text-muted-foreground block">Overnight & Weekend</span>
+                                  <strong className="text-foreground">{ch.overnight_weekend || 'YES | YES'}</strong>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] uppercase font-semibold text-muted-foreground block">EA & Algo</span>
+                                  <strong className="text-foreground">{ch.ea_algo_trading || 'YES | YES'}</strong>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] uppercase font-semibold text-muted-foreground block">Drawdown Model</span>
+                                  <strong className="text-foreground">{ch.loss_type || 'Static'}</strong>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Dedicated Crypto Parameters if Applicable */}
+                            {ch.category === 'crypto' && (
+                              <div className="p-3 rounded-xl bg-white dark:bg-card border border-zinc-200 dark:border-border space-y-1.5">
+                                <span className="font-bold text-[11px] text-foreground uppercase tracking-tight flex items-center gap-1.5">
+                                  <span className="inline-flex items-center justify-center w-4 h-4 rounded bg-black text-white dark:bg-white dark:text-black text-[9px] font-bold">
+                                    ₿
+                                  </span>
+                                  Dedicated Crypto Challenge Parameters
+                                </span>
+                                <div className="grid grid-cols-3 gap-3 text-xs pt-1">
+                                  <div>
+                                    <span className="text-[10px] uppercase font-semibold text-muted-foreground block">MAX Leverage</span>
+                                    <strong className="text-foreground font-mono">{ch.crypto_max_leverage || '1:5'}</strong>
+                                  </div>
+                                  <div>
+                                    <span className="text-[10px] uppercase font-semibold text-muted-foreground block">Max Open Positions</span>
+                                    <strong className="text-foreground font-mono">{ch.crypto_max_open_positions || '5 Positions'}</strong>
+                                  </div>
+                                  <div>
+                                    <span className="text-[10px] uppercase font-semibold text-muted-foreground block">Total Notional Exposure</span>
+                                    <strong className="text-foreground font-mono">{ch.crypto_total_notional_exposure || '$250,000'}</strong>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
             </div>
           )}
 
@@ -505,7 +845,7 @@ export function FirmProfileClient({
           {activeTab === 'reviews' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {firmReviews.map((rev) => (
+                {effectiveReviews.map((rev) => (
                   <div key={rev.id} className="bg-white dark:bg-card border border-zinc-200 dark:border-border rounded-2xl p-6 space-y-3.5 shadow-xs">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1">

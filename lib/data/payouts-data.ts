@@ -3,8 +3,8 @@ import { Payout } from '@/lib/types';
 export const MOCK_PAYOUTS: Payout[] = [
   {
     id: 'pay-1',
-    firm_id: 'ftmo',
-    firm_name: 'FTMO',
+    firm_id: 'dolvero',
+    firm_name: 'Dolvero',
     trader_display_name: 'Alex Mercer',
     amount: 12500,
     currency: 'USD',

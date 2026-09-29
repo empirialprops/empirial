@@ -52,6 +52,26 @@ const ALL_EVALUATION_MODELS = [
   'Futures Combine',
 ];
 
+const ALL_FIRM_TYPES = [
+  'Forex',
+  'Futures',
+  'Crypto',
+  'Instant Funding',
+  'Prediction Markets',
+  'Synthetic',
+];
+
+const COMMON_RESTRICTED_COUNTRIES = [
+  'United States',
+  'Canada',
+  'Cuba',
+  'Iran',
+  'North Korea',
+  'Syria',
+  'Russia',
+  'Belarus',
+];
+
 export default function AdminFirmsPage() {
   const [firms, setFirms] = useState<Firm[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,9 +86,11 @@ export default function AdminFirmsPage() {
     'futures',
     'crypto',
     'instant-funding',
+    'prediction-markets',
   ]);
   const [newFilterInput, setNewFilterInput] = useState('');
   const [showFilterManager, setShowFilterManager] = useState(false);
+  const [customCountryInput, setCustomCountryInput] = useState('');
 
   // Form States for Adding / Editing (Includes Image 1 specifications)
   const [formData, setFormData] = useState<Partial<Firm> & { logo_shape?: string }>({
@@ -107,6 +129,12 @@ export default function AdminFirmsPage() {
     min_price: 99,
     consistency_rules_content: 'No strict consistency rule on standard accounts.',
     firm_rules_content: 'Minimum 0 trading days (No minimum requirement).',
+    consistency_rule: 'No strict consistency rule',
+    payout_cycle: 'Bi-Weekly / 14 Days',
+    payout_split_pct: 90,
+    leverage: '1:100',
+    firm_types: ['Forex'],
+    restricted_jurisdictions: ['United States', 'North Korea', 'Iran'],
     description: 'Forensically audited prop firm with institutional liquidity and verified payouts.',
   });
 
@@ -174,6 +202,53 @@ export default function AdminFirmsPage() {
     });
   };
 
+  const toggleFirmType = (fType: string) => {
+    const current = formData.firm_types || [];
+    const next = current.includes(fType)
+      ? current.filter((t) => t !== fType)
+      : [...current, fType];
+    const candidateCat = next[0]?.toLowerCase().replace(/\s+/g, '-');
+    const validCats = ['forex', 'futures', 'crypto', 'instant-funding', 'all'];
+    const nextCat = (validCats.includes(candidateCat) ? candidateCat : formData.category || 'forex') as Firm['category'];
+    setFormData({
+      ...formData,
+      firm_types: next,
+      category: nextCat,
+    });
+  };
+
+  const toggleRestrictedJurisdiction = (country: string) => {
+    const current = formData.restricted_jurisdictions || [];
+    const next = current.includes(country)
+      ? current.filter((c) => c !== country)
+      : [...current, country];
+    setFormData({
+      ...formData,
+      restricted_jurisdictions: next,
+    });
+  };
+
+  const handleAddCustomCountry = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customCountryInput.trim()) return;
+    const current = formData.restricted_jurisdictions || [];
+    if (!current.includes(customCountryInput.trim())) {
+      setFormData({
+        ...formData,
+        restricted_jurisdictions: [...current, customCountryInput.trim()],
+      });
+    }
+    setCustomCountryInput('');
+  };
+
+  const handleRemoveRestrictedJurisdiction = (country: string) => {
+    const current = formData.restricted_jurisdictions || [];
+    setFormData({
+      ...formData,
+      restricted_jurisdictions: current.filter((c) => c !== country),
+    });
+  };
+
   const handleAddDirectoryFilter = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFilterInput.trim()) return;
@@ -225,6 +300,12 @@ export default function AdminFirmsPage() {
       min_price: 99,
       consistency_rules_content: 'No consistency rule.',
       firm_rules_content: 'No minimum trading days.',
+      consistency_rule: 'No strict consistency rule',
+      payout_cycle: 'Bi-Weekly / 14 Days',
+      payout_split_pct: 90,
+      leverage: '1:100',
+      firm_types: ['Forex'],
+      restricted_jurisdictions: ['United States', 'North Korea', 'Iran'],
       description: 'Audited prop trading firm with institutional trading conditions.',
     });
     setEditingFirm(null);
@@ -243,6 +324,12 @@ export default function AdminFirmsPage() {
       total_payouts: firm.total_payouts || '$15,000,000+',
       avg_payout_time: firm.avg_payout_time || '8-24 Hours',
       years_working: firm.years_working || (firm.founded_year ? `Est. ${firm.founded_year}` : 'Est. 2024'),
+      consistency_rule: firm.consistency_rule || firm.consistency_rules_content || 'No strict consistency rule',
+      payout_cycle: firm.payout_cycle || firm.payout_custom || 'Bi-Weekly / 14 Days',
+      payout_split_pct: firm.payout_split_pct || 90,
+      leverage: firm.leverage || '1:100',
+      firm_types: firm.firm_types && firm.firm_types.length > 0 ? firm.firm_types : (firm.category ? [firm.category.charAt(0).toUpperCase() + firm.category.slice(1)] : ['Forex']),
+      restricted_jurisdictions: firm.restricted_jurisdictions || ['United States', 'North Korea', 'Iran'],
     });
     setEditingFirm(firm);
     setIsAdding(true);
@@ -317,6 +404,12 @@ export default function AdminFirmsPage() {
       min_price: parseNum(formData.min_price, 99),
       consistency_rules_content: formData.consistency_rules_content || 'No Consistency Rule',
       firm_rules_content: formData.firm_rules_content || '0 Days (No Min)',
+      consistency_rule: formData.consistency_rule || 'No strict consistency rule',
+      payout_cycle: formData.payout_cycle || 'Bi-Weekly / 14 Days',
+      payout_split_pct: parseNum(formData.payout_split_pct, 90),
+      leverage: formData.leverage || '1:100',
+      firm_types: formData.firm_types && formData.firm_types.length > 0 ? formData.firm_types : ['Forex'],
+      restricted_jurisdictions: formData.restricted_jurisdictions || [],
       description: formData.description || 'Audited prop firm.',
     };
 
@@ -608,6 +701,28 @@ export default function AdminFirmsPage() {
                       {m}
                     </span>
                   ))}
+                </div>
+              </div>
+
+              {/* Firm Types & Rules Strip */}
+              <div className="mt-3 space-y-1.5">
+                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                  <span className="font-semibold uppercase">Firm Types:</span>
+                  <span className="font-mono font-medium text-foreground">Lev: {firm.leverage || '1:100'}</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {(firm.firm_types && firm.firm_types.length > 0 ? firm.firm_types : [firm.category || 'Forex']).map((t) => (
+                    <span
+                      key={t}
+                      className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-black text-white dark:bg-white dark:text-black"
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </div>
+                <div className="text-[10px] text-muted-foreground flex items-center justify-between pt-0.5">
+                  <span>Cycle: <strong className="text-foreground">{firm.payout_cycle || firm.payout_custom || 'Bi-Weekly'}</strong></span>
+                  <span>Rule: <strong className="text-foreground truncate max-w-[130px]">{firm.consistency_rule || 'Standard'}</strong></span>
                 </div>
               </div>
 
@@ -907,9 +1022,160 @@ export default function AdminFirmsPage() {
                 </div>
               </div>
 
+              {/* MULTI FIRM TYPE SELECTION (1 firm can have multiple types, including Prediction Markets) */}
+              <div className="space-y-2 md:col-span-2 p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-xs text-foreground uppercase tracking-tight block">
+                    Multi Firm Types Supported (Select all that apply) *
+                  </label>
+                  <span className="text-[10px] text-muted-foreground">e.g. Forex + Crypto + Prediction Markets</span>
+                </div>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {ALL_FIRM_TYPES.map((fType) => {
+                    const isSelected = (formData.firm_types || []).includes(fType);
+                    return (
+                      <button
+                        key={fType}
+                        type="button"
+                        onClick={() => toggleFirmType(fType)}
+                        className={`px-3 py-1.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all ${
+                          isSelected
+                            ? 'bg-black text-white dark:bg-white dark:text-black border-black dark:border-white shadow-2xs'
+                            : 'bg-white dark:bg-card text-muted-foreground border-zinc-200 dark:border-zinc-800 hover:border-foreground'
+                        }`}
+                      >
+                        <span>{fType}</span>
+                        {isSelected && <Check className="w-3.5 h-3.5 inline ml-1" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* ADDITIONAL FIRM RULES & SPECS */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Consistency Rule</label>
+                <input
+                  type="text"
+                  value={formData.consistency_rule || ''}
+                  onChange={(e) => setFormData({ ...formData, consistency_rule: e.target.value })}
+                  placeholder="e.g. No strict consistency rule, or Max 30% daily"
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-none focus:border-foreground"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Payout Cycle</label>
+                <input
+                  type="text"
+                  value={formData.payout_cycle || ''}
+                  onChange={(e) => setFormData({ ...formData, payout_cycle: e.target.value })}
+                  placeholder="e.g. Bi-Weekly / 14 Days, Weekly, On-Demand"
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-none focus:border-foreground"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Payout Split (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={formData.payout_split_pct ?? 90}
+                  onChange={(e) => setFormData({ ...formData, payout_split_pct: parseInt(e.target.value, 10) || 0 })}
+                  placeholder="e.g. 90"
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-none focus:border-foreground font-mono font-bold"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Account Leverage</label>
+                <input
+                  type="text"
+                  value={formData.leverage || ''}
+                  onChange={(e) => setFormData({ ...formData, leverage: e.target.value })}
+                  placeholder="e.g. 1:100, 1:50"
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-none focus:border-foreground font-mono"
+                />
+              </div>
+
+              {/* RESTRICTED JURISDICTIONS SETTINGS */}
+              <div className="space-y-2.5 md:col-span-2 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-foreground" />
+                    <label className="font-bold text-xs text-foreground uppercase tracking-tight">
+                      Restricted Jurisdictions & Countries
+                    </label>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">Select forbidden/restricted regions</span>
+                </div>
+
+                <div className="space-y-2">
+                  <span className="text-[11px] font-semibold text-muted-foreground block">Quick Toggle Common Restrictions:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {COMMON_RESTRICTED_COUNTRIES.map((country) => {
+                      const isRestricted = (formData.restricted_jurisdictions || []).includes(country);
+                      return (
+                        <button
+                          key={country}
+                          type="button"
+                          onClick={() => toggleRestrictedJurisdiction(country)}
+                          className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium transition-all ${
+                            isRestricted
+                              ? 'bg-black text-white dark:bg-white dark:text-black border-black dark:border-white'
+                              : 'bg-white dark:bg-card text-muted-foreground border-zinc-200 dark:border-zinc-800 hover:border-foreground'
+                          }`}
+                        >
+                          <span>{country}</span>
+                          {isRestricted && <Check className="w-3 h-3 inline ml-1" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="pt-2 flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={customCountryInput}
+                      onChange={(e) => setCustomCountryInput(e.target.value)}
+                      placeholder="Add another country or jurisdiction..."
+                      className="flex-1 bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-foreground focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCustomCountry}
+                      className="px-3 py-1.5 rounded-xl bg-black text-white dark:bg-white dark:text-black text-xs font-semibold hover:opacity-90"
+                    >
+                      Add Jurisdiction
+                    </button>
+                  </div>
+
+                  {formData.restricted_jurisdictions && formData.restricted_jurisdictions.length > 0 && (
+                    <div className="pt-2 flex flex-wrap gap-1.5">
+                      {formData.restricted_jurisdictions.map((rj) => (
+                        <span
+                          key={rj}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-200 dark:bg-zinc-800 text-[11px] font-medium text-foreground"
+                        >
+                          <span>{rj}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveRestrictedJurisdiction(rj)}
+                            className="text-muted-foreground hover:text-red-500"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Category */}
               <div className="space-y-1">
-                <label className="font-semibold text-foreground">Category</label>
+                <label className="font-semibold text-foreground">Primary Category</label>
                 <select
                   value={formData.category || 'forex'}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}

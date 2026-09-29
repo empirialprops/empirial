@@ -73,62 +73,6 @@ Stay disciplined and preserve your daily floor!`,
     created_at: '2026-08-27T16:15:00Z',
   },
   {
-    id: 'sp-3',
-    author_id: 'author-firm-2',
-    author_name: 'Topstep',
-    author_handle: '@topstep_official',
-    author_avatar: '/logos/topstep.png',
-    is_verified: true,
-    author_role: 'firm',
-    firm_badge: 'Prop Firm Official',
-    firm_logo: '/logos/topstep.png',
-    content: `📢 **CME Futures Trading Combine: Balance-Based Drawdown Update**
-
-We have officially updated the Express Trading Combine evaluation parameter on all CME Futures (ES, NQ, YM, CL).
-
-Daily loss limits are calculated strictly from **05:00 PM CT Day-Start Balance**, eliminating intra-day floating high-water mark trailing penalties. This gives momentum and breakout traders full breathing room during high-impact FOMC & CPI releases.
-
-Instant daily payout requests are active upon establishing your consistency buffer.`,
-    link_preview: {
-      url: 'https://topstep.com/express-combine-rules',
-      title: 'Topstep 2026 Combine Rules & Payout Policy Breakdown',
-      description: 'Tradovate & NinjaTrader CME contracts with zero trailing intraday drawdown.',
-      domain: 'topstep.com',
-    },
-    category: 'ACCOUNT RULES',
-    upvotes: 95,
-    downvotes: 2,
-    upvoted_by: [],
-    downvoted_by: [],
-    created_at: '2026-08-27T12:00:00Z',
-  },
-  {
-    id: 'sp-4',
-    author_id: 'author-analyst-1',
-    author_name: 'Elena Vance',
-    author_handle: '@elena_compliance',
-    author_avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100&auto=format&fit=crop&q=80',
-    is_verified: true,
-    author_role: 'analyst',
-    firm_badge: 'Compliance & Audit Lead',
-    content: `🧠 **The Post-Payout Psychological Trap: Why 68% of Funded Traders Breach in Week 2**
-
-Over 68% of traders who withdraw their first $5,000+ payout breach their funded account within the subsequent 14 calendar days.
-
-The psychological root causes:
-- **Dopamine & Overconfidence**: Subconsciously believing the market owes them uninterrupted wins.
-- **Rushing the Next Milestone**: Increasing position sizes to double payout velocity.
-- **Micro-Rule Neglect**: Skipping pre-trade session checklist routines.
-
-**The Fix**: After every approved payout, treat day 1 as if you were starting a fresh trial. Reduce lot size by 50% for 3 sessions until psychological equilibrium is restored.`,
-    category: 'TRADING PSYCHOLOGY',
-    upvotes: 184,
-    downvotes: 3,
-    upvoted_by: [],
-    downvoted_by: [],
-    created_at: '2026-08-27T09:40:00Z',
-  },
-  {
     id: 'sp-5',
     author_id: 'author-firm-3',
     author_name: 'Alpha Capital Group',
@@ -157,32 +101,7 @@ All Alpha Pro 2-Step evaluations now feature **0.0 pip raw spreads** and **$0 co
   },
 ];
 
-export const INITIAL_VERIFICATION_APPLICATIONS: VerificationApplication[] = [
-  {
-    id: 'vapp-101',
-    user_id: 'trader-002',
-    user_name: 'Marcus Vance',
-    user_email: 'marcus.vance@trader.io',
-    user_avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-    trading_experience: '5 years full-time FX and Gold trader. Currently funded on FTMO ($200K) and NYS Capital ($100K). Looking to publish daily SMC market structure analysis.',
-    category: 'Funded Trader',
-    proof_links: 'https://empirial.com/payouts/proof-mv9912 | Discord: @marcus_fx#8892',
-    applied_at: '2026-08-27T14:20:00Z',
-    status: 'pending',
-  },
-  {
-    id: 'vapp-102',
-    user_id: 'trader-003',
-    user_name: 'Shark Funded Official',
-    user_email: 'compliance@sharkfunded.com',
-    user_avatar: '/logos/shark.png',
-    trading_experience: 'Official institutional representative for Shark Funded prop firm. Need verified access to post rule updates and flash promo codes.',
-    category: 'Prop Firm Official',
-    proof_links: 'https://sharkfunded.com | business registration #SF-2026',
-    applied_at: '2026-08-26T11:00:00Z',
-    status: 'pending',
-  },
-];
+export const INITIAL_VERIFICATION_APPLICATIONS: VerificationApplication[] = [];
 
 // Helper Storage Keys
 const POSTS_KEY = 'empirial_social_posts';
@@ -198,7 +117,22 @@ export function getStoredSocialPosts(): SocialPost[] {
     return INITIAL_SOCIAL_POSTS;
   }
   try {
-    return JSON.parse(saved);
+    const parsed = JSON.parse(saved);
+    if (Array.isArray(parsed)) {
+      // Purge any legacy dummy posts
+      const filtered = parsed.filter(
+        (p) =>
+          p &&
+          p.author_name !== 'Topstep' &&
+          p.author_name !== 'Elena Vance' &&
+          !p.content?.toLowerCase().includes('ftmo')
+      );
+      if (filtered.length !== parsed.length) {
+        localStorage.setItem(POSTS_KEY, JSON.stringify(filtered));
+      }
+      return filtered.length > 0 ? filtered : INITIAL_SOCIAL_POSTS;
+    }
+    return INITIAL_SOCIAL_POSTS;
   } catch (e) {
     return INITIAL_SOCIAL_POSTS;
   }
@@ -358,7 +292,17 @@ export function getStoredVerificationApplications(): VerificationApplication[] {
     return INITIAL_VERIFICATION_APPLICATIONS;
   }
   try {
-    return JSON.parse(saved);
+    const parsed = JSON.parse(saved);
+    if (Array.isArray(parsed)) {
+      const filtered = parsed.filter(
+        (a) => a && a.id !== 'vapp-101' && a.id !== 'vapp-102' && !a.trading_experience?.toLowerCase().includes('ftmo')
+      );
+      if (filtered.length !== parsed.length) {
+        localStorage.setItem(APPS_KEY, JSON.stringify(filtered));
+      }
+      return filtered;
+    }
+    return INITIAL_VERIFICATION_APPLICATIONS;
   } catch (e) {
     return INITIAL_VERIFICATION_APPLICATIONS;
   }

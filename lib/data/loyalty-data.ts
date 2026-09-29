@@ -2,11 +2,11 @@ import { LoyaltyReward } from '@/lib/types';
 
 export const MOCK_REWARDS: LoyaltyReward[] = [
   {
-    id: 'rew-ftmo-100',
-    title: 'Free FTMO $10K Challenge Voucher',
-    description: 'Get a 100% discount promo voucher for a standard $10,000 evaluation challenge at FTMO.',
+    id: 'rew-dolvero-100',
+    title: 'Free Dolvero $10K Challenge Voucher',
+    description: 'Get a 100% discount promo voucher for a standard $10,000 evaluation challenge at Dolvero.',
     points_cost: 2000,
-    voucher_code: 'FTMO-FREE-10K-XYZ',
+    voucher_code: 'DOLVERO-FREE-10K-XYZ',
     is_available: true,
     category: 'challenges'
   },

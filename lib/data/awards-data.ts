@@ -8,7 +8,7 @@ export const MOCK_AWARDS: Award[] = [
     year: 2026,
     is_voting_open: true,
     nominated_firms: [
-      { firm_id: 'ftmo', firm_name: 'FTMO', votes: 450 },
+      { firm_id: 'dolvero', firm_name: 'Dolvero', votes: 450 },
       { firm_id: 'nys', firm_name: 'NYS Capital', votes: 310 },
       { firm_id: 'ck-capital', firm_name: 'CK Capital', votes: 280 }
     ]
@@ -21,8 +21,8 @@ export const MOCK_AWARDS: Award[] = [
     is_voting_open: true,
     nominated_firms: [
       { firm_id: 'nys', firm_name: 'NYS Capital', votes: 380 },
-      { firm_id: 'funding-pips', firm_name: 'Funding Pips', votes: 320 },
-      { firm_id: 'the5ers', firm_name: 'The5ers', votes: 290 }
+      { firm_id: 'shark-funded', firm_name: 'Shark Funded', votes: 320 },
+      { firm_id: 'alpha-capital', firm_name: 'Alpha Capital', votes: 290 }
     ]
   }
 ];

@@ -1,0 +1,69 @@
+'use client';
+
+import { Firm } from '@/lib/types';
+import { MOCK_FIRMS } from '@/lib/data/firms-data';
+
+const STORAGE_KEY = 'empirial_firms_list';
+const INITIALIZED_KEY = 'empirial_firms_initialized';
+
+export function getStoredFirms(): Firm[] {
+  if (typeof window === 'undefined') return MOCK_FIRMS;
+  try {
+    const isInit = localStorage.getItem(INITIALIZED_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY);
+
+    if (isInit === 'true' && raw) {
+      let parsed: Firm[] = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Strip out unadded default firms
+        parsed = parsed.filter(f => f.id !== 'ftmo' && f.id !== 'funding-pips' && f.slug !== 'ftmo' && f.slug !== 'funding-pips');
+        
+        // Ensure authentic MOCK_FIRMS exist
+        const existingIds = new Set(parsed.map(f => f.id));
+        const missingMocks = MOCK_FIRMS.filter(m => !existingIds.has(m.id));
+        if (missingMocks.length > 0) {
+          parsed = [...parsed, ...missingMocks];
+        }
+        return parsed;
+      }
+    }
+
+    localStorage.setItem(INITIALIZED_KEY, 'true');
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(MOCK_FIRMS));
+    return MOCK_FIRMS;
+  } catch {
+    return MOCK_FIRMS;
+  }
+}
+
+export function saveStoredFirms(firms: Firm[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(INITIALIZED_KEY, 'true');
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(firms));
+    window.dispatchEvent(new CustomEvent('empirial_firms_changed', { detail: firms }));
+  } catch (err) {
+    console.error('Failed to save firms to localStorage:', err);
+  }
+}
+
+export function addStoredFirm(firm: Firm): Firm[] {
+  const current = getStoredFirms();
+  const updated = [firm, ...current.filter((f) => f.id !== firm.id)];
+  saveStoredFirms(updated);
+  return updated;
+}
+
+export function updateStoredFirm(id: string, updates: Partial<Firm>): Firm[] {
+  const current = getStoredFirms();
+  const updated = current.map((f) => (f.id === id ? { ...f, ...updates } : f));
+  saveStoredFirms(updated);
+  return updated;
+}
+
+export function deleteStoredFirm(id: string): Firm[] {
+  const current = getStoredFirms();
+  const updated = current.filter((f) => f.id !== id);
+  saveStoredFirms(updated);
+  return updated;
+}

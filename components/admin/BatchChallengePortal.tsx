@@ -187,6 +187,11 @@ export default function BatchChallengePortal({
   const [overnightWeekend, setOvernightWeekend] = useState<string>('YES | YES');
   const [refundableFee, setRefundableFee] = useState<boolean>(true);
   const [avgPayout, setAvgPayout] = useState<string>('$5,400');
+  const [maxRiskPerTrade, setMaxRiskPerTrade] = useState<string>('2% / Trade');
+  const [inactivityPeriod, setInactivityPeriod] = useState<string>('30 Days');
+  const [cryptoMaxLeverage, setCryptoMaxLeverage] = useState<string>('1:5');
+  const [cryptoMaxOpenPositions, setCryptoMaxOpenPositions] = useState<string>('5 Positions');
+  const [cryptoTotalNotionalExposure, setCryptoTotalNotionalExposure] = useState<string>('$250,000');
 
   // Execution state
   const [customSizeInput, setCustomSizeInput] = useState<string>('');
@@ -474,6 +479,11 @@ export default function BatchChallengePortal({
           rating: currentFirm?.rating || 4.9,
           review_count: currentFirm?.review_count || 1200,
           consistency_rule: hasConsistencyRule ? consistencyDetails : 'No Consistency Rule',
+          max_risk_per_trade: maxRiskPerTrade || '2% / Trade',
+          inactivity_period: inactivityPeriod || '30 Days',
+          crypto_max_leverage: cryptoMaxLeverage || '1:5',
+          crypto_max_open_positions: cryptoMaxOpenPositions || '5 Positions',
+          crypto_total_notional_exposure: cryptoTotalNotionalExposure || '$250,000',
           news_trading: newsTrading,
           overnight_weekend: overnightWeekend,
           loss_type: lossType,
@@ -1395,6 +1405,78 @@ export default function BatchChallengePortal({
                   onChange={(e) => setMaxTradingDays(e.target.value)}
                   placeholder="Unlimited"
                   className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-foreground font-semibold"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Max Risk Per Trade & Inactivity Period */}
+          <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-2">
+            <span className="font-bold text-foreground text-xs block">Risk & Inactivity Parameters</span>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] font-semibold text-muted-foreground uppercase block">Max Risk / Trade</label>
+                <input
+                  type="text"
+                  value={maxRiskPerTrade}
+                  onChange={(e) => setMaxRiskPerTrade(e.target.value)}
+                  placeholder="2% / Trade"
+                  className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-foreground font-mono font-semibold"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-muted-foreground uppercase block">Inactivity Period</label>
+                <input
+                  type="text"
+                  value={inactivityPeriod}
+                  onChange={(e) => setInactivityPeriod(e.target.value)}
+                  placeholder="30 Days"
+                  className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-foreground font-mono font-semibold"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Dedicated Crypto Challenges Settings */}
+          <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-2 md:col-span-2 lg:col-span-3">
+            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
+              <span className="font-bold text-foreground text-xs flex items-center gap-1.5">
+                <span className="inline-flex items-center justify-center w-4 h-4 rounded bg-black text-white dark:bg-white dark:text-black text-[9px] font-bold">
+                  ₿
+                </span>
+                Dedicated Crypto Challenges Settings
+              </span>
+              <span className="text-[10px] text-muted-foreground font-medium">Applied to crypto & multi-asset challenges in this batch</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              <div>
+                <label className="text-[10px] font-semibold text-muted-foreground uppercase block">MAX Leverage</label>
+                <input
+                  type="text"
+                  value={cryptoMaxLeverage}
+                  onChange={(e) => setCryptoMaxLeverage(e.target.value)}
+                  placeholder="1:5"
+                  className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-foreground font-mono font-bold"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-muted-foreground uppercase block">Max Open Positions</label>
+                <input
+                  type="text"
+                  value={cryptoMaxOpenPositions}
+                  onChange={(e) => setCryptoMaxOpenPositions(e.target.value)}
+                  placeholder="5 Positions"
+                  className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-foreground font-mono font-bold"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-muted-foreground uppercase block">Total Notional Exposure</label>
+                <input
+                  type="text"
+                  value={cryptoTotalNotionalExposure}
+                  onChange={(e) => setCryptoTotalNotionalExposure(e.target.value)}
+                  placeholder="$250,000"
+                  className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-foreground font-mono font-bold"
                 />
               </div>
             </div>

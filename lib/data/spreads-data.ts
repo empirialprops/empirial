@@ -23,22 +23,22 @@ export const MOCK_SPREADS: BrokerSpread[] = [
   },
   {
     id: 'spr-3',
-    feed_name: 'FTMO Forex Feed',
+    feed_name: 'Dolvero Prime Liquidity',
     pair: 'EURUSD',
-    spread_pips: 0.2,
+    spread_pips: 0.1,
     commission_per_lot: 3,
-    account_type: 'FTMO Account',
-    platform: 'MT5',
+    account_type: 'Raw Spreads',
+    platform: 'cTrader',
     status: 'active'
   },
   {
     id: 'spr-4',
-    feed_name: 'Funding Pips Prime',
+    feed_name: 'Shark Funded Liquidity',
     pair: 'XAUUSD',
-    spread_pips: 1.2,
+    spread_pips: 1.1,
     commission_per_lot: 2,
     account_type: 'Raw Spreads',
-    platform: 'Match-Trader',
+    platform: 'MT5',
     status: 'active'
   }
 ];
