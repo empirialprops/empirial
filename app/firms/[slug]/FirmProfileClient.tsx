@@ -35,6 +35,9 @@ import { Firm, Challenge, Deal, Review, Payout } from '@/lib/types';
 import { calculateFirmMetrics } from '@/lib/utils/rating-calculator';
 import { getStoredChallenges } from '@/lib/utils/challenges-store';
 import { getStoredReviews } from '@/lib/utils/reviews-store';
+import { getStoredFirms } from '@/lib/utils/firms-store';
+import { getStoredPlatforms, PlatformItem } from '@/lib/utils/platforms-store';
+import { parseConsistencyRule, parseMinTradingDays } from '@/lib/utils/comparison-calc';
 
 // Platform Logo Dictionary from downloaded assets
 const PLATFORM_DATA: Record<string, { name: string; logo: string; type: 'forex' | 'futures' }> = {
@@ -78,11 +81,40 @@ export function FirmProfileClient({
     firm.name.toLowerCase().includes('sure leverage') ||
     firm.name.toLowerCase().includes('slf');
 
+  // Dynamic effective firm synced from localStorage & custom events
+  const [effectiveFirm, setEffectiveFirm] = useState<Firm>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = getStoredFirms();
+      const found = stored.find((f) => f.id === firm.id || f.slug === firm.slug || (isSlf && ['sure-leverage', 'sure-leverage-funding', 'slf'].includes(f.slug.toLowerCase())));
+      if (found) return found;
+    }
+    return firm;
+  });
+
+  // Dynamic platforms lookup
+  const [platformDict, setPlatformDict] = useState<Record<string, { name: string; logo: string; type: 'forex' | 'futures' }>>(() => {
+    const dict = { ...PLATFORM_DATA };
+    if (typeof window !== 'undefined') {
+      const stored = getStoredPlatforms();
+      stored.forEach((p) => {
+        dict[p.id] = { name: p.name, logo: p.logo, type: p.type === 'futures' ? 'futures' : 'forex' };
+      });
+    }
+    return dict;
+  });
+
   const [effectiveChallenges, setEffectiveChallenges] = useState<Challenge[]>(firmChallenges);
   const [effectiveReviews, setEffectiveReviews] = useState<Review[]>(firmReviews);
 
   useEffect(() => {
-    // 1. Sync stored challenges for this firm
+    // 1. Sync firm itself
+    const storedF = getStoredFirms();
+    const matchedF = storedF.find((f) => f.id === firm.id || f.slug === firm.slug || (isSlf && ['sure-leverage', 'sure-leverage-funding', 'slf'].includes(f.slug.toLowerCase())));
+    if (matchedF) {
+      setEffectiveFirm(matchedF);
+    }
+
+    // 2. Sync stored challenges for this firm
     const storedCh = getStoredChallenges();
     const matchingStoredCh = storedCh.filter((c) => {
       if (c.firm_id === firm.id || c.firm_slug === firm.slug) return true;
@@ -103,7 +135,7 @@ export function FirmProfileClient({
       setEffectiveChallenges(firmChallenges);
     }
 
-    // 2. Sync stored reviews (especially SLF reviews)
+    // 3. Sync stored reviews (especially SLF reviews)
     const storedRev = getStoredReviews();
     const matchingStoredRev = storedRev.filter((r) => {
       const rId = (r.firm_id || '').toLowerCase();
@@ -127,6 +159,30 @@ export function FirmProfileClient({
     } else {
       setEffectiveReviews(firmReviews);
     }
+
+    // 4. Listen to firms & platforms change events
+    const handleFirmsChanged = (e: CustomEvent) => {
+      const list: Firm[] = e.detail || getStoredFirms();
+      const found = list.find((f) => f.id === firm.id || f.slug === firm.slug || (isSlf && ['sure-leverage', 'sure-leverage-funding', 'slf'].includes(f.slug.toLowerCase())));
+      if (found) setEffectiveFirm(found);
+    };
+
+    const handlePlatformsChanged = (e: CustomEvent) => {
+      const stored: PlatformItem[] = e.detail || getStoredPlatforms();
+      const dict = { ...PLATFORM_DATA };
+      stored.forEach((p) => {
+        dict[p.id] = { name: p.name, logo: p.logo, type: p.type === 'futures' ? 'futures' : 'forex' };
+      });
+      setPlatformDict(dict);
+    };
+
+    window.addEventListener('empirial_firms_changed' as any, handleFirmsChanged);
+    window.addEventListener('empirial_platforms_changed' as any, handlePlatformsChanged);
+
+    return () => {
+      window.removeEventListener('empirial_firms_changed' as any, handleFirmsChanged);
+      window.removeEventListener('empirial_platforms_changed' as any, handlePlatformsChanged);
+    };
   }, [firm.id, firm.slug, isSlf, firmChallenges, firmReviews]);
 
   const handleCopyCode = (code: string) => {
@@ -138,16 +194,20 @@ export function FirmProfileClient({
   };
 
   // Genuine Synced Rating metrics calculations
-  const metrics = calculateFirmMetrics(firm, effectiveReviews);
+  const metrics = calculateFirmMetrics(effectiveFirm, effectiveReviews);
   const totalReviewsCount = metrics.reviewCount;
   const computedRating = metrics.rating;
 
-  // Platforms lookup
-  const platformKeys = (firm.platform_ids || []).filter((pid) => PLATFORM_DATA[pid]);
+  // Consistency & Min Trading Days calculation
+  const consistencyInfo = parseConsistencyRule(effectiveFirm.consistency_rule || effectiveFirm.consistency_rules_content);
+  const minDaysInfo = parseMinTradingDays(effectiveFirm.min_trading_days ?? effectiveFirm.firm_rules_content);
 
-  const getFirmBuyUrl = (firm: Firm): string => {
-    if (firm.buy_url && firm.buy_url.startsWith('http')) {
-      return firm.buy_url;
+  // Platforms lookup
+  const platformKeys = (effectiveFirm.platform_ids || []).filter((pid) => platformDict[pid]);
+
+  const getFirmBuyUrl = (f: Firm): string => {
+    if (f.buy_url && f.buy_url.startsWith('http')) {
+      return f.buy_url;
     }
     const slugToUrlMap: Record<string, string> = {
       'nys': 'https://nyscapital.com?ref=empirial',
@@ -161,10 +221,10 @@ export function FirmProfileClient({
       'ftmo': 'https://ftmo.com?ref=empirial',
       'funding-pips': 'https://fundingpips.com?ref=empirial',
     };
-    return slugToUrlMap[firm.id] || slugToUrlMap[firm.slug] || `https://${firm.slug}.com?ref=empirial`;
+    return slugToUrlMap[f.id] || slugToUrlMap[f.slug] || `https://${f.slug}.com?ref=empirial`;
   };
 
-  const officialSiteUrl = getFirmBuyUrl(firm);
+  const officialSiteUrl = getFirmBuyUrl(effectiveFirm);
 
   return (
     <TooltipProvider>
@@ -180,15 +240,15 @@ export function FirmProfileClient({
               {/* Firm Brand & Basic Specs */}
               <div className="flex items-start sm:items-center gap-4 sm:gap-5">
                 <div className="shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center p-2 overflow-hidden shadow-xs">
-                  {firm.logo_url ? (
+                  {effectiveFirm.logo_url ? (
                     <img
-                      src={firm.logo_url}
-                      alt={firm.name}
+                      src={effectiveFirm.logo_url}
+                      alt={effectiveFirm.name}
                       className="h-12 w-auto max-w-[56px] object-contain rounded-md"
                     />
                   ) : (
                     <span className="font-black text-xl sm:text-2xl text-foreground">
-                      {firm.name.substring(0, 3).toUpperCase()}
+                      {effectiveFirm.name.substring(0, 3).toUpperCase()}
                     </span>
                   )}
                 </div>
@@ -196,9 +256,9 @@ export function FirmProfileClient({
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h1 className="text-xl sm:text-3xl font-extrabold text-foreground tracking-tight">
-                      {firm.name}
+                      {effectiveFirm.name}
                     </h1>
-                    {firm.is_verified && (
+                    {effectiveFirm.is_verified && (
                       <span className="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-300/40 dark:border-emerald-600/30 px-2.5 py-0.5 rounded-full text-xs font-bold">
                         <ShieldCheck className="w-3.5 h-3.5" />
                         Verified Audited
@@ -212,7 +272,7 @@ export function FirmProfileClient({
                   </div>
 
                   <p className="text-xs sm:text-sm text-muted-foreground max-w-2xl">
-                    {firm.description || 'Audited proprietary trading platform featuring institutional funding models.'}
+                    {effectiveFirm.description || 'Audited proprietary trading platform featuring institutional funding models.'}
                   </p>
 
                   {/* Platforms list with zoom hover */}
@@ -220,7 +280,7 @@ export function FirmProfileClient({
                     <span className="text-muted-foreground font-semibold">Platforms:</span>
                     {platformKeys.length > 0 ? (
                       platformKeys.map((pid) => {
-                        const p = PLATFORM_DATA[pid];
+                        const p = platformDict[pid] || { name: pid.toUpperCase(), logo: '/platforms/mt5.png', type: 'forex' };
                         return (
                           <Tooltip key={pid}>
                             <TooltipTrigger asChild>
@@ -228,7 +288,7 @@ export function FirmProfileClient({
                                 whileHover={{ scale: 1.25 }}
                                 className="w-6 h-6 rounded-md bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center p-0.5 cursor-pointer"
                               >
-                                <img src={p.logo} alt={p.name} className="h-4 w-4 object-contain" />
+                                <img src={p.logo} alt={p.name} className="h-4 w-4 object-contain rounded" />
                               </motion.div>
                             </TooltipTrigger>
                             <TooltipContent side="top" className="text-[11px] font-bold bg-black text-white dark:bg-white dark:text-black">
@@ -238,7 +298,7 @@ export function FirmProfileClient({
                         );
                       })
                     ) : (
-                      <span className="font-bold text-foreground">{firm.platforms || 'MT5, cTrader'}</span>
+                      <span className="font-bold text-foreground">{effectiveFirm.platforms || 'MT5, cTrader'}</span>
                     )}
                   </div>
                 </div>
@@ -249,7 +309,7 @@ export function FirmProfileClient({
                 {/* Discount Code Button */}
                 <button
                   type="button"
-                  onClick={() => handleCopyCode(firm.coupon_code_custom || 'EMPIRE')}
+                  onClick={() => handleCopyCode(effectiveFirm.coupon_code_custom || 'EMPIRE')}
                   className="px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-foreground text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-xs"
                 >
                   {copiedCode ? (
@@ -260,14 +320,14 @@ export function FirmProfileClient({
                   ) : (
                     <>
                       <Copy className="w-4 h-4" />
-                      <span>{firm.discount_label_custom || '20% OFF'}</span>
+                      <span>{effectiveFirm.discount_label_custom || effectiveFirm.coupon_code_custom || '20% OFF'}</span>
                     </>
                   )}
                 </button>
 
                 {/* Compare Link */}
                 <Link
-                  href={`/compare?firms=${firm.slug}`}
+                  href={`/compare?firms=${effectiveFirm.slug}`}
                   className="px-4 py-2.5 rounded-xl border border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-card dark:text-foreground dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-2 transition-all shadow-xs"
                 >
                   <Layers className="w-4 h-4" />
@@ -297,7 +357,7 @@ export function FirmProfileClient({
                     HEADQUARTERS
                   </span>
                   <span className="text-xs sm:text-sm font-extrabold text-foreground">
-                    {firm.headquarters || 'Dubai, UAE'}
+                    {effectiveFirm.headquarters || 'Dubai, UAE'}
                   </span>
                 </div>
               </div>
@@ -310,7 +370,7 @@ export function FirmProfileClient({
                     EXPERIENCE
                   </span>
                   <span className="text-xs sm:text-sm font-extrabold text-foreground">
-                    {firm.years_working || `Est. ${firm.founded_year || '2024'}`}
+                    {effectiveFirm.years_working || `Est. ${effectiveFirm.founded_year || '2024'}`}
                   </span>
                 </div>
               </div>
@@ -323,7 +383,7 @@ export function FirmProfileClient({
                     TOTAL PAYOUTS
                   </span>
                   <span className="text-xs sm:text-sm font-extrabold text-foreground">
-                    {firm.total_payouts || '$15,000,000+'}
+                    {effectiveFirm.total_payouts || '$15,000,000+'}
                   </span>
                 </div>
               </div>
@@ -336,7 +396,7 @@ export function FirmProfileClient({
                     AVG PAYOUT SLA
                   </span>
                   <span className="text-xs sm:text-sm font-extrabold text-foreground">
-                    {firm.avg_payout_time || '8-24 Hours'}
+                    {effectiveFirm.avg_payout_time || '8-24 Hours'}
                   </span>
                 </div>
               </div>
@@ -346,7 +406,7 @@ export function FirmProfileClient({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
               <div className="flex items-center gap-2 flex-wrap text-xs">
                 <span className="text-muted-foreground font-semibold">Models:</span>
-                {(firm.models || ['1-Step Challenge', '2-Step Evaluation', 'Instant Model']).map((model) => (
+                {(effectiveFirm.models || ['1-Step Challenge', '2-Step Evaluation', 'Instant Model']).map((model) => (
                   <span
                     key={model}
                     className="px-3 py-1 rounded-lg text-xs font-semibold bg-zinc-100 dark:bg-zinc-900 text-foreground border border-zinc-200 dark:border-zinc-800"
@@ -355,10 +415,10 @@ export function FirmProfileClient({
                   </span>
                 ))}
 
-                {(firm.firm_types && firm.firm_types.length > 0) && (
+                {(effectiveFirm.firm_types && effectiveFirm.firm_types.length > 0) && (
                   <>
                     <span className="text-muted-foreground font-semibold ml-2">Types:</span>
-                    {firm.firm_types.map((ft) => (
+                    {effectiveFirm.firm_types.map((ft) => (
                       <span
                         key={ft}
                         className="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-black text-white dark:bg-white dark:text-black"
@@ -371,19 +431,31 @@ export function FirmProfileClient({
               </div>
 
               <div className="text-xs text-muted-foreground font-medium flex items-center gap-3">
-                <span>Max Alloc: <strong className="text-foreground font-bold">{firm.max_allocation}</strong></span>
-                <span>Split: <strong className="text-foreground font-bold">{firm.payout_split_pct ? `${firm.payout_split_pct}%` : firm.profit_split_custom}</strong></span>
-                <span>Lev: <strong className="text-foreground font-bold">{firm.leverage || '1:100'}</strong></span>
+                <span>Max Alloc: <strong className="text-foreground font-bold">{effectiveFirm.max_allocation}</strong></span>
+                <span>Split: <strong className="text-foreground font-bold">{effectiveFirm.payout_split_pct ? `${effectiveFirm.payout_split_pct}%` : effectiveFirm.profit_split_custom}</strong></span>
+                <span>Lev: <strong className="text-foreground font-bold">{effectiveFirm.leverage || '1:100'}</strong></span>
               </div>
             </div>
 
             {/* Firm Specs Bar */}
-            <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-              <div>
-                <span>Consistency Rule: <strong className="text-foreground font-semibold">{firm.consistency_rule || firm.consistency_rules_content || 'No strict consistency rule'}</strong></span>
+            <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <span>Consistency Rule:</span>
+                <strong className="text-foreground font-semibold">
+                  {effectiveFirm.consistency_rule || effectiveFirm.consistency_rules_content || 'No strict consistency rule'}
+                </strong>
               </div>
-              <div>
-                <span>Payout Cycle: <strong className="text-foreground font-semibold">{firm.payout_cycle || firm.payout_custom || 'Bi-Weekly / 14 Days'}</strong></span>
+              <div className="flex items-center gap-1.5">
+                <span>Min Trading Days:</span>
+                <strong className="text-foreground font-semibold">
+                  {minDaysInfo.displayValue}
+                </strong>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span>Payout Cycle:</span>
+                <strong className="text-foreground font-semibold">
+                  {effectiveFirm.payout_cycle || effectiveFirm.payout_custom || 'Bi-Weekly / 14 Days'}
+                </strong>
               </div>
             </div>
           </div>
@@ -423,8 +495,22 @@ export function FirmProfileClient({
                     <h2>Risk & Consistency Rules</h2>
                   </div>
                   <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                    {firm.consistency_rules_content || 'No strict lot size consistency required. Hedging allowed across open accounts. Weekend holding permitted on Swing accounts.'}
+                    {effectiveFirm.consistency_rules_content || effectiveFirm.consistency_rule || 'No strict lot size consistency required. Hedging allowed across open accounts. Weekend holding permitted on Swing accounts.'}
                   </p>
+                  {/* Article Link for Consistency Rule (Point 3 - Minimal rules link) */}
+                  {effectiveFirm.consistency_rule_article_url && (
+                    <div className="pt-2">
+                      <a
+                        href={effectiveFirm.consistency_rule_article_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-900 dark:text-zinc-100 hover:underline bg-zinc-50 dark:bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 transition-colors"
+                      >
+                        <span>{effectiveFirm.consistency_rule_article_title || 'Read Official Consistency Rule Article'}</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  )}
                 </div>
 
                 {/* Drawdown Rules */}
@@ -434,12 +520,53 @@ export function FirmProfileClient({
                     <h2>Evaluation & Maximum Drawdown Rules</h2>
                   </div>
                   <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                    {firm.firm_rules_content || 'Maximum daily drawdown calculated based on previous day balance or equity at 00:00 CE(S)T. Hard breach results in immediate account closure.'}
+                    {effectiveFirm.firm_rules_content || 'Maximum daily drawdown calculated based on previous day balance or equity at 00:00 CE(S)T. Hard breach results in immediate account closure.'}
                   </p>
+                  {/* Article Link for Drawdown Rules (Point 3 - Minimal rules link) */}
+                  {effectiveFirm.firm_rules_article_url && (
+                    <div className="pt-2">
+                      <a
+                        href={effectiveFirm.firm_rules_article_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-900 dark:text-zinc-100 hover:underline bg-zinc-50 dark:bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 transition-colors"
+                      >
+                        <span>{effectiveFirm.firm_rules_article_title || 'Read Official Drawdown Policy'}</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  )}
                 </div>
 
+                {/* Extra Rule Articles (Point 3 - Minimal & Convenient) */}
+                {effectiveFirm.rule_articles && effectiveFirm.rule_articles.length > 0 && (
+                  <div className="bg-white dark:bg-card border border-zinc-200 dark:border-border rounded-2xl p-6 space-y-3 shadow-xs">
+                    <div className="flex items-center gap-2 text-foreground font-bold text-base">
+                      <Tag className="w-5 h-5 text-purple-500" />
+                      <h2>Official Rule Articles & Documentation</h2>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Deep dive into verified firm policies, special allowances, and rule FAQs:
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {effectiveFirm.rule_articles.map((art, aIdx) => (
+                        <a
+                          key={aIdx}
+                          href={art.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground hover:underline bg-zinc-50 dark:bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 transition-colors"
+                        >
+                          <span>{art.title}</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Payout Schedule */}
-                {firm.payout_programs && firm.payout_programs.length > 0 && (
+                {effectiveFirm.payout_programs && effectiveFirm.payout_programs.length > 0 && (
                   <div className="bg-white dark:bg-card border border-zinc-200 dark:border-border rounded-2xl p-6 space-y-4 shadow-xs">
                     <h2 className="text-foreground font-bold text-base">Payout Tiers & Scaling Model</h2>
                     <div className="overflow-x-auto">
@@ -452,7 +579,7 @@ export function FirmProfileClient({
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                          {firm.payout_programs.map((prog, idx) => (
+                          {effectiveFirm.payout_programs.map((prog, idx) => (
                             <tr key={idx} className="text-foreground">
                               <td className="py-2.5 font-bold">{prog.name}</td>
                               <td className="py-2.5 font-mono text-muted-foreground">{prog.schedule}</td>
@@ -478,7 +605,12 @@ export function FirmProfileClient({
                     Traders residing in the following jurisdictions are prohibited:
                   </p>
                   <div className="flex flex-wrap gap-1.5 pt-1">
-                    {(firm.restricted_countries || ['US', 'IR', 'KP', 'SY', 'CU']).map((country) => (
+                    {((effectiveFirm.restricted_jurisdictions && effectiveFirm.restricted_jurisdictions.length > 0)
+                      ? effectiveFirm.restricted_jurisdictions
+                      : (effectiveFirm.restricted_countries && effectiveFirm.restricted_countries.length > 0)
+                      ? effectiveFirm.restricted_countries
+                      : ['United States', 'Iran', 'North Korea', 'Syria', 'Cuba']
+                    ).map((country) => (
                       <span
                         key={country}
                         className="px-2.5 py-1 rounded-md bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-mono font-bold"
@@ -490,18 +622,24 @@ export function FirmProfileClient({
                 </div>
 
                 {/* Active Promo Deal */}
-                {firmDeals.length > 0 && (
+                {(firmDeals.length > 0 || effectiveFirm.coupon_code_custom) && (
                   <div className="bg-white dark:bg-card border-2 border-black dark:border-white rounded-2xl p-6 space-y-3 shadow-xs">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-foreground uppercase tracking-wider">ACTIVE PROMO</span>
-                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">-{firmDeals[0].discount_pct}% OFF</span>
+                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                        -{firmDeals[0]?.discount_pct || effectiveFirm.discount_pct || 20}% OFF
+                      </span>
                     </div>
-                    <h3 className="text-base font-bold text-foreground">{firmDeals[0].discount_label}</h3>
+                    <h3 className="text-base font-bold text-foreground">
+                      {firmDeals[0]?.discount_label || effectiveFirm.discount_label_custom || 'EXCLUSIVE DISCOUNT'}
+                    </h3>
                     <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-                      <span className="font-mono text-xs font-extrabold text-foreground">{firmDeals[0].code}</span>
+                      <span className="font-mono text-xs font-extrabold text-foreground">
+                        {firmDeals[0]?.code || effectiveFirm.coupon_code_custom || 'EMPIRE'}
+                      </span>
                       <button
                         type="button"
-                        onClick={() => handleCopyCode(firmDeals[0].code)}
+                        onClick={() => handleCopyCode(firmDeals[0]?.code || effectiveFirm.coupon_code_custom || 'EMPIRE')}
                         className="px-3 py-1.5 rounded-lg bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black text-xs font-semibold shadow-xs cursor-pointer"
                       >
                         {copiedCode ? 'Copied' : 'Copy'}

@@ -1,14 +1,88 @@
 export type StaffRole = 'admin' | 'data_entry' | 'reviews_support';
 
+export interface StaffPermissions {
+  manage_firms?: boolean;
+  manage_platforms?: boolean;
+  manage_challenges?: boolean;
+  manage_deals?: boolean;
+  manage_events?: boolean;
+  manage_reviews?: boolean;
+  manage_messages?: boolean;
+  manage_cms?: boolean;
+  manage_staff?: boolean;
+  manage_settings?: boolean;
+  manage_spreads?: boolean;
+  manage_blog?: boolean;
+}
+
+export const DEFAULT_ROLE_PERMISSIONS: Record<StaffRole, StaffPermissions> = {
+  admin: {
+    manage_firms: true,
+    manage_platforms: true,
+    manage_challenges: true,
+    manage_deals: true,
+    manage_events: true,
+    manage_reviews: true,
+    manage_messages: true,
+    manage_cms: true,
+    manage_staff: true,
+    manage_settings: true,
+    manage_spreads: true,
+    manage_blog: true,
+  },
+  data_entry: {
+    manage_firms: true,
+    manage_platforms: true,
+    manage_challenges: true,
+    manage_deals: true,
+    manage_events: true,
+    manage_reviews: false,
+    manage_messages: false,
+    manage_cms: false,
+    manage_staff: false,
+    manage_settings: false,
+    manage_spreads: true,
+    manage_blog: true,
+  },
+  reviews_support: {
+    manage_firms: false,
+    manage_platforms: false,
+    manage_challenges: false,
+    manage_deals: false,
+    manage_events: false,
+    manage_reviews: true,
+    manage_messages: true,
+    manage_cms: false,
+    manage_staff: false,
+    manage_settings: false,
+    manage_spreads: false,
+    manage_blog: false,
+  },
+};
+
 export interface StaffProfile {
   id: string;
   email: string;
   password?: string;
   displayName: string;
   role: StaffRole;
+  permissions?: StaffPermissions;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export function hasStaffPermission(
+  profile: StaffProfile | { role?: string; permissions?: StaffPermissions } | null | undefined,
+  permission: keyof StaffPermissions
+): boolean {
+  if (!profile) return false;
+  const role = (profile.role || 'data_entry') as StaffRole;
+  if (role === 'admin' || (profile as any).role === 'super_admin') return true;
+  if (profile.permissions && profile.permissions[permission] !== undefined) {
+    return !!profile.permissions[permission];
+  }
+  return !!DEFAULT_ROLE_PERMISSIONS[role]?.[permission];
 }
 
 export const INITIAL_STAFF_PROFILES: StaffProfile[] = [
@@ -18,6 +92,7 @@ export const INITIAL_STAFF_PROFILES: StaffProfile[] = [
     password: 'AdminMaster@2026',
     displayName: 'Super Admin',
     role: 'admin',
+    permissions: DEFAULT_ROLE_PERMISSIONS.admin,
     is_active: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -28,6 +103,7 @@ export const INITIAL_STAFF_PROFILES: StaffProfile[] = [
     password: 'Anuraj@admin12145',
     displayName: 'Master Admin (Anuraj)',
     role: 'admin',
+    permissions: DEFAULT_ROLE_PERMISSIONS.admin,
     is_active: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -38,6 +114,7 @@ export const INITIAL_STAFF_PROFILES: StaffProfile[] = [
     password: 'DataEntry@2026',
     displayName: 'Data Entry Officer',
     role: 'data_entry',
+    permissions: DEFAULT_ROLE_PERMISSIONS.data_entry,
     is_active: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -48,6 +125,7 @@ export const INITIAL_STAFF_PROFILES: StaffProfile[] = [
     password: 'Support@2026',
     displayName: 'Reviews & Support Agent',
     role: 'reviews_support',
+    permissions: DEFAULT_ROLE_PERMISSIONS.reviews_support,
     is_active: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),

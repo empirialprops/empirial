@@ -18,10 +18,14 @@ import {
   RefreshCw,
   Eye,
   EyeOff,
+  Check,
 } from 'lucide-react';
 import {
   StaffProfile,
   StaffRole,
+  StaffPermissions,
+  DEFAULT_ROLE_PERMISSIONS,
+  hasStaffPermission,
   getStoredStaffProfiles,
   saveStaffProfiles,
   addStaffProfile,
@@ -30,6 +34,21 @@ import {
   getRoleDisplayName,
 } from '@/lib/utils/roles-store';
 import { logAdminAction } from '@/lib/utils/audit-log-store';
+
+const PERMISSION_OPTIONS: Array<{ key: keyof StaffPermissions; label: string; desc: string }> = [
+  { key: 'manage_firms', label: 'Prop Firms Directory', desc: 'Create, edit, and configure prop firm profiles & rules' },
+  { key: 'manage_platforms', label: 'Trading Platforms', desc: 'Add new platforms, upload logos, configure platforms' },
+  { key: 'manage_challenges', label: 'Evaluation Challenges', desc: 'Add/edit account sizes, rules, and pricing' },
+  { key: 'manage_deals', label: 'Discount Promo Deals', desc: 'Create coupons, discount percentages, and affiliate codes' },
+  { key: 'manage_events', label: 'Tournaments & Events', desc: 'Publish and manage trading competitions and events' },
+  { key: 'manage_spreads', label: 'Spreads & Commission', desc: 'Manage broker spread comparisons and fee matrices' },
+  { key: 'manage_reviews', label: 'Reviews Moderation', desc: 'Approve, moderate, reject, or flag user reviews' },
+  { key: 'manage_messages', label: 'Support Inbox', desc: 'Read and respond to contact & support requests' },
+  { key: 'manage_blog', label: 'Blog & Articles', desc: 'Write and publish educational content & articles' },
+  { key: 'manage_cms', label: 'Home Page CMS', desc: 'Reorder sections, hero banners, and visual layouts' },
+  { key: 'manage_staff', label: 'Staff & Roles', desc: 'Manage admin users, credentials, and access permissions' },
+  { key: 'manage_settings', label: 'System Settings', desc: 'Configure global metadata, security, and preferences' },
+];
 
 export default function AdminRolesPage() {
   const [profiles, setProfiles] = useState<StaffProfile[]>([]);
@@ -46,6 +65,7 @@ export default function AdminRolesPage() {
   const [formName, setFormName] = useState('');
   const [formRole, setFormRole] = useState<StaffRole>('data_entry');
   const [formActive, setFormActive] = useState(true);
+  const [formPermissions, setFormPermissions] = useState<StaffPermissions>(DEFAULT_ROLE_PERMISSIONS.data_entry);
 
   useEffect(() => {
     setProfiles(getStoredStaffProfiles());
@@ -64,6 +84,7 @@ export default function AdminRolesPage() {
     setFormName('');
     setFormRole('data_entry');
     setFormActive(true);
+    setFormPermissions({ ...DEFAULT_ROLE_PERMISSIONS.data_entry });
     setIsModalOpen(true);
   };
 
@@ -74,7 +95,23 @@ export default function AdminRolesPage() {
     setFormName(profile.displayName);
     setFormRole(profile.role);
     setFormActive(profile.is_active);
+    setFormPermissions({
+      ...(DEFAULT_ROLE_PERMISSIONS[profile.role] || {}),
+      ...(profile.permissions || {}),
+    });
     setIsModalOpen(true);
+  };
+
+  const handleRoleChange = (newRole: StaffRole) => {
+    setFormRole(newRole);
+    setFormPermissions({ ...DEFAULT_ROLE_PERMISSIONS[newRole] });
+  };
+
+  const handleTogglePermission = (key: keyof StaffPermissions) => {
+    setFormPermissions((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
   };
 
   const handleSaveModalForm = (e: React.FormEvent) => {
@@ -82,12 +119,13 @@ export default function AdminRolesPage() {
     if (!formEmail.trim() || !formName.trim()) return;
 
     if (editingProfile) {
-      const updatedItem = {
+      const updatedItem: StaffProfile = {
         ...editingProfile,
         email: formEmail.trim().toLowerCase(),
         password: formPassword.trim() || editingProfile.password,
         displayName: formName.trim(),
         role: formRole,
+        permissions: formPermissions,
         is_active: formActive,
         updated_at: new Date().toISOString(),
       };
@@ -108,6 +146,7 @@ export default function AdminRolesPage() {
         password: formPassword.trim() || 'EmpirialStaff@2026',
         displayName: formName.trim(),
         role: formRole,
+        permissions: formPermissions,
         is_active: formActive,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -305,6 +344,7 @@ export default function AdminRolesPage() {
                 <th className="p-4">Login Email</th>
                 <th className="p-4">Password</th>
                 <th className="p-4">Assigned Role</th>
+                <th className="p-4">Permissions</th>
                 <th className="p-4">Status</th>
                 <th className="p-4 text-right">Actions</th>
               </tr>
@@ -361,6 +401,26 @@ export default function AdminRolesPage() {
                       >
                         {getRoleDisplayName(profile.role)}
                       </span>
+                    </td>
+
+                    <td className="p-4">
+                      {profile.role === 'admin' ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 text-foreground border border-zinc-200 dark:border-zinc-700">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>Full Master (12/12)</span>
+                        </span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1 max-w-[240px]">
+                          {PERMISSION_OPTIONS.filter((opt) => hasStaffPermission(profile, opt.key)).map((opt) => (
+                            <span
+                              key={opt.key}
+                              className="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-900 text-[9px] font-semibold text-foreground border border-zinc-200 dark:border-zinc-800"
+                            >
+                              {opt.label.replace('Prop ', '').replace('Evaluation ', '').replace('Discount ', '')}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </td>
 
                     <td className="p-4">
@@ -487,13 +547,62 @@ export default function AdminRolesPage() {
                 </label>
                 <select
                   value={formRole}
-                  onChange={(e) => setFormRole(e.target.value as StaffRole)}
+                  onChange={(e) => handleRoleChange(e.target.value as StaffRole)}
                   className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-foreground focus:outline-none transition-all cursor-pointer font-medium"
                 >
-                  <option value="data_entry">DATA ENTRY (Firms, Challenges, Deals, Events, Contact/About)</option>
+                  <option value="data_entry">DATA ENTRY (Firms, Platforms, Challenges, Deals, Events)</option>
                   <option value="reviews_support">REVIEWS SUPPORT (Support Inbox & Reviews Moderation)</option>
                   <option value="admin">SUPER ADMIN (Full Portal Master Access)</option>
                 </select>
+              </div>
+
+              {/* Granular Module Permissions */}
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-foreground block">
+                    Granular Module Permissions
+                  </label>
+                  <span className="text-[10px] text-muted-foreground font-medium">
+                    {formRole === 'admin' ? 'All granted for Super Admin' : 'Click to customize access'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                  {PERMISSION_OPTIONS.map((opt) => {
+                    const isChecked = formRole === 'admin' ? true : !!formPermissions[opt.key];
+                    return (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        disabled={formRole === 'admin'}
+                        onClick={() => handleTogglePermission(opt.key)}
+                        className={`flex items-start gap-2 p-2 rounded-lg text-left transition-all cursor-pointer ${
+                          isChecked
+                            ? 'bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 shadow-2xs'
+                            : 'opacity-60 hover:opacity-100 border border-transparent'
+                        }`}
+                      >
+                        <div
+                          className={`w-4 h-4 rounded mt-0.5 flex items-center justify-center shrink-0 border transition-colors ${
+                            isChecked
+                              ? 'bg-black text-white dark:bg-white dark:text-black border-black dark:border-white'
+                              : 'border-zinc-400 dark:border-zinc-600'
+                          }`}
+                        >
+                          {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-xs font-semibold text-foreground block leading-tight truncate">
+                            {opt.label}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground block line-clamp-1">
+                            {opt.desc}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="flex items-center gap-3 pt-2">

@@ -7,11 +7,12 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/config';
 import { getStoredUser, logoutUser } from '@/lib/utils/auth-store';
-import { getRoleDisplayName } from '@/lib/utils/roles-store';
+import { getRoleDisplayName, hasStaffPermission, StaffPermissions } from '@/lib/utils/roles-store';
 import {
   Shield,
   LayoutDashboard,
   Building2,
+  Monitor,
   Trophy,
   Tag,
   Star,
@@ -25,6 +26,9 @@ import {
   Lock,
   History,
   Sparkles,
+  Activity,
+  TrendingUp,
+  FileText,
 } from 'lucide-react';
 
 interface AdminNavItem {
@@ -33,6 +37,7 @@ interface AdminNavItem {
   icon: React.ComponentType<any>;
   badge?: string;
   roles: string[];
+  permission?: keyof StaffPermissions;
 }
 
 const STAFF_ROLES = ['admin', 'super_admin', 'data_entry', 'reviews_support'];
@@ -136,22 +141,32 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const allNavItems: AdminNavItem[] = [
     { name: 'Dashboard Overview', href: '/admin', icon: LayoutDashboard, roles: ['admin', 'super_admin', 'data_entry', 'reviews_support'] },
-    { name: 'Prop Firms Directory', href: '/admin/firms', icon: Building2, roles: ['admin', 'super_admin', 'data_entry'] },
-    { name: 'Evaluation Challenges', href: '/admin/challenges', icon: Trophy, badge: 'Portal', roles: ['admin', 'super_admin', 'data_entry'] },
-    { name: 'Discount Promo Deals', href: '/admin/deals', icon: Tag, roles: ['admin', 'super_admin', 'data_entry'] },
-    { name: 'Tournaments & Events', href: '/admin/events', icon: Calendar, roles: ['admin', 'super_admin', 'data_entry'] },
-    { name: 'Reviews Moderation', href: '/admin/reviews', icon: Star, roles: ['admin', 'super_admin', 'reviews_support'] },
-    { name: 'Support Inbox', href: '/admin/messages', icon: Mail, roles: ['admin', 'super_admin', 'reviews_support'] },
-    { name: 'Home Page CMS', href: '/admin/page-builder', icon: Sliders, roles: ['admin', 'super_admin'] },
+    { name: 'Prop Firms Directory', href: '/admin/firms', icon: Building2, roles: ['admin', 'super_admin', 'data_entry'], permission: 'manage_firms' },
+    { name: 'Trading Platforms', href: '/admin/platforms', icon: Monitor, badge: 'New', roles: ['admin', 'super_admin', 'data_entry'], permission: 'manage_platforms' },
+    { name: 'Evaluation Challenges', href: '/admin/challenges', icon: Trophy, badge: 'Portal', roles: ['admin', 'super_admin', 'data_entry'], permission: 'manage_challenges' },
+    { name: 'Discount Promo Deals', href: '/admin/deals', icon: Tag, roles: ['admin', 'super_admin', 'data_entry'], permission: 'manage_deals' },
+    { name: 'Tournaments & Events', href: '/admin/events', icon: Calendar, roles: ['admin', 'super_admin', 'data_entry'], permission: 'manage_events' },
+    { name: 'Spreads & Commission', href: '/admin/spreads', icon: Activity, roles: ['admin', 'super_admin', 'data_entry'], permission: 'manage_spreads' },
+    { name: 'Market Ticker Feed', href: '/admin/market-ticker', icon: TrendingUp, roles: ['admin', 'super_admin', 'data_entry'] },
+    { name: 'Reviews Moderation', href: '/admin/reviews', icon: Star, roles: ['admin', 'super_admin', 'reviews_support'], permission: 'manage_reviews' },
+    { name: 'Support Inbox', href: '/admin/messages', icon: Mail, roles: ['admin', 'super_admin', 'reviews_support'], permission: 'manage_messages' },
+    { name: 'Blog & Articles', href: '/admin/blog', icon: FileText, roles: ['admin', 'super_admin', 'data_entry'], permission: 'manage_blog' },
+    { name: 'Home Page CMS', href: '/admin/page-builder', icon: Sliders, roles: ['admin', 'super_admin'], permission: 'manage_cms' },
     { name: 'Media Library', href: '/admin/media', icon: ImageIcon, roles: ['admin', 'super_admin'] },
-    { name: 'Staff & Role Profiles', href: '/admin/roles', icon: UserCheck, roles: ['admin', 'super_admin'] },
+    { name: 'Staff & Role Profiles', href: '/admin/roles', icon: UserCheck, roles: ['admin', 'super_admin'], permission: 'manage_staff' },
     { name: 'Audit Logs & Undo', href: '/admin/logs', icon: History, roles: ['admin', 'super_admin'] },
     { name: 'State Hall & Social', href: '/admin/social', icon: Sparkles, roles: ['admin', 'super_admin', 'reviews_support'] },
-    { name: 'System Settings', href: '/admin/settings', icon: Settings, roles: ['admin', 'super_admin', 'data_entry', 'reviews_support'] },
+    { name: 'System Settings', href: '/admin/settings', icon: Settings, roles: ['admin', 'super_admin', 'data_entry', 'reviews_support'], permission: 'manage_settings' },
   ];
 
   const userRole = currentUser?.role || 'admin';
-  const allowedNav = allNavItems.filter((item) => item.roles.includes(userRole));
+  const allowedNav = allNavItems.filter((item) => {
+    if (userRole === 'admin' || userRole === 'super_admin') return true;
+    if (item.permission && currentUser) {
+      return hasStaffPermission(currentUser, item.permission);
+    }
+    return item.roles.includes(userRole);
+  });
 
   // Route protection
   useEffect(() => {
@@ -171,9 +186,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       if (isStaff && pathname !== '/admin/login') {
         const targetNav = allNavItems.find((item) => item.href === pathname);
-        if (targetNav && !targetNav.roles.includes(activeUser.role)) {
-          const fallback = allowedNav[0]?.href || '/admin';
-          router.replace(fallback);
+        if (targetNav) {
+          const isAllowed =
+            activeUser.role === 'admin' ||
+            activeUser.role === 'super_admin' ||
+            (targetNav.permission
+              ? hasStaffPermission(activeUser, targetNav.permission)
+              : targetNav.roles.includes(activeUser.role));
+          if (!isAllowed) {
+            const fallback = allowedNav[0]?.href || '/admin';
+            router.replace(fallback);
+          }
         }
       }
     }

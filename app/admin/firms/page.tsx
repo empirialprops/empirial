@@ -23,26 +23,15 @@ import {
   DollarSign,
   Tag,
   Filter,
+  Monitor,
 } from 'lucide-react';
+import Link from 'next/link';
 import { MOCK_FIRMS } from '@/lib/data/firms-data';
 import { Firm } from '@/lib/types';
 import { getFirms, createFirm, updateFirm, deleteFirm } from '@/lib/firebase/services';
 import { logAdminAction } from '@/lib/utils/audit-log-store';
+import { PlatformItem, getStoredPlatforms } from '@/lib/utils/platforms-store';
 
-const ALL_PLATFORMS = [
-  { id: 'mt5', name: 'MetaTrader 5', icon: '/platforms/mt5.png' },
-  { id: 'mt4', name: 'MetaTrader 4', icon: '/platforms/mt5.png' },
-  { id: 'ctrader', name: 'cTrader', icon: '/platforms/ctrader.svg' },
-  { id: 'match-trader', name: 'Match-Trader', icon: '/platforms/match-trader.svg' },
-  { id: 'tradelocker', name: 'TradeLocker', icon: '/platforms/tradelocker.jpeg' },
-  { id: 'tradingview', name: 'TradingView', icon: '/platforms/tradingview.png' },
-  { id: 'tradovate', name: 'Tradovate', icon: '/platforms/tradovate.png' },
-  { id: 'ninjatrader', name: 'NinjaTrader', icon: '/platforms/ninjatrader.svg' },
-  { id: 'bookmap', name: 'Bookmap', icon: '/platforms/bookmap.jpeg' },
-  { id: 'atas', name: 'ATAS', icon: '/platforms/atas.jpeg' },
-  { id: 'multicharts', name: 'MultiCharts', icon: '/platforms/multicharts.svg' },
-  { id: 'deepcharts', name: 'DeepCharts', icon: '/platforms/deepcharts.jpeg' },
-];
 
 const ALL_EVALUATION_MODELS = [
   '1-Step Challenge',
@@ -91,6 +80,9 @@ export default function AdminFirmsPage() {
   const [newFilterInput, setNewFilterInput] = useState('');
   const [showFilterManager, setShowFilterManager] = useState(false);
   const [customCountryInput, setCustomCountryInput] = useState('');
+  const [availablePlatforms, setAvailablePlatforms] = useState<PlatformItem[]>(() => getStoredPlatforms());
+  const [newRuleArticleTitle, setNewRuleArticleTitle] = useState('');
+  const [newRuleArticleUrl, setNewRuleArticleUrl] = useState('');
 
   // Form States for Adding / Editing (Includes Image 1 specifications)
   const [formData, setFormData] = useState<Partial<Firm> & { logo_shape?: string }>({
@@ -130,6 +122,12 @@ export default function AdminFirmsPage() {
     consistency_rules_content: 'No strict consistency rule on standard accounts.',
     firm_rules_content: 'Minimum 0 trading days (No minimum requirement).',
     consistency_rule: 'No strict consistency rule',
+    consistency_rule_article_title: '',
+    consistency_rule_article_url: '',
+    min_trading_days: 0,
+    firm_rules_article_title: '',
+    firm_rules_article_url: '',
+    rule_articles: [],
     payout_cycle: 'Bi-Weekly / 14 Days',
     payout_split_pct: 90,
     leverage: '1:100',
@@ -137,6 +135,14 @@ export default function AdminFirmsPage() {
     restricted_jurisdictions: ['United States', 'North Korea', 'Iran'],
     description: 'Forensically audited prop firm with institutional liquidity and verified payouts.',
   });
+
+  useEffect(() => {
+    const handlePlatChanged = (e: CustomEvent) => {
+      if (e.detail) setAvailablePlatforms(e.detail);
+    };
+    window.addEventListener('empirial_platforms_changed' as any, handlePlatChanged);
+    return () => window.removeEventListener('empirial_platforms_changed' as any, handlePlatChanged);
+  }, []);
 
   useEffect(() => {
     async function loadFirms() {
@@ -187,7 +193,7 @@ export default function AdminFirmsPage() {
     setFormData({
       ...formData,
       platform_ids: next,
-      platforms: next.map((id) => ALL_PLATFORMS.find((p) => p.id === id)?.name || id).join(', '),
+      platforms: next.map((id) => availablePlatforms.find((p) => p.id === id)?.name || id).join(', '),
     });
   };
 
@@ -301,6 +307,12 @@ export default function AdminFirmsPage() {
       consistency_rules_content: 'No consistency rule.',
       firm_rules_content: 'No minimum trading days.',
       consistency_rule: 'No strict consistency rule',
+      consistency_rule_article_title: '',
+      consistency_rule_article_url: '',
+      min_trading_days: 0,
+      firm_rules_article_title: '',
+      firm_rules_article_url: '',
+      rule_articles: [],
       payout_cycle: 'Bi-Weekly / 14 Days',
       payout_split_pct: 90,
       leverage: '1:100',
@@ -325,11 +337,19 @@ export default function AdminFirmsPage() {
       avg_payout_time: firm.avg_payout_time || '8-24 Hours',
       years_working: firm.years_working || (firm.founded_year ? `Est. ${firm.founded_year}` : 'Est. 2024'),
       consistency_rule: firm.consistency_rule || firm.consistency_rules_content || 'No strict consistency rule',
+      consistency_rules_content: firm.consistency_rules_content || firm.consistency_rule || '',
+      consistency_rule_article_title: firm.consistency_rule_article_title || '',
+      consistency_rule_article_url: firm.consistency_rule_article_url || '',
+      min_trading_days: firm.min_trading_days !== undefined ? firm.min_trading_days : 0,
+      firm_rules_content: firm.firm_rules_content || '',
+      firm_rules_article_title: firm.firm_rules_article_title || '',
+      firm_rules_article_url: firm.firm_rules_article_url || '',
+      rule_articles: firm.rule_articles || [],
       payout_cycle: firm.payout_cycle || firm.payout_custom || 'Bi-Weekly / 14 Days',
       payout_split_pct: firm.payout_split_pct || 90,
       leverage: firm.leverage || '1:100',
       firm_types: firm.firm_types && firm.firm_types.length > 0 ? firm.firm_types : (firm.category ? [firm.category.charAt(0).toUpperCase() + firm.category.slice(1)] : ['Forex']),
-      restricted_jurisdictions: firm.restricted_jurisdictions || ['United States', 'North Korea', 'Iran'],
+      restricted_jurisdictions: firm.restricted_jurisdictions || firm.restricted_countries || ['United States', 'North Korea', 'Iran'],
     });
     setEditingFirm(firm);
     setIsAdding(true);
@@ -402,14 +422,21 @@ export default function AdminFirmsPage() {
       daily_loss_pct: parseNum(formData.daily_loss_pct, 5),
       profit_target_pct: parseNum(formData.profit_target_pct, 8),
       min_price: parseNum(formData.min_price, 99),
-      consistency_rules_content: formData.consistency_rules_content || 'No Consistency Rule',
-      firm_rules_content: formData.firm_rules_content || '0 Days (No Min)',
-      consistency_rule: formData.consistency_rule || 'No strict consistency rule',
+      consistency_rules_content: formData.consistency_rules_content || formData.consistency_rule || 'No strict consistency rule',
+      firm_rules_content: formData.firm_rules_content || 'Minimum 0 trading days (No minimum requirement).',
+      consistency_rule: formData.consistency_rule || formData.consistency_rules_content || 'No strict consistency rule',
+      consistency_rule_article_title: formData.consistency_rule_article_title || '',
+      consistency_rule_article_url: formData.consistency_rule_article_url || '',
+      min_trading_days: formData.min_trading_days !== undefined ? formData.min_trading_days : 0,
+      firm_rules_article_title: formData.firm_rules_article_title || '',
+      firm_rules_article_url: formData.firm_rules_article_url || '',
+      rule_articles: formData.rule_articles || [],
       payout_cycle: formData.payout_cycle || 'Bi-Weekly / 14 Days',
       payout_split_pct: parseNum(formData.payout_split_pct, 90),
       leverage: formData.leverage || '1:100',
       firm_types: formData.firm_types && formData.firm_types.length > 0 ? formData.firm_types : ['Forex'],
       restricted_jurisdictions: formData.restricted_jurisdictions || [],
+      restricted_countries: formData.restricted_jurisdictions || [],
       description: formData.description || 'Audited prop firm.',
     };
 
@@ -996,11 +1023,26 @@ export default function AdminFirmsPage() {
                 />
               </div>
 
-              {/* Platforms Multi-Select */}
-              <div className="space-y-2 md:col-span-2">
-                <label className="font-semibold text-foreground block">Platforms Supported</label>
-                <div className="flex flex-wrap gap-2">
-                  {ALL_PLATFORMS.map((plat) => {
+              {/* Platforms Multi-Select with Quick Link to Platforms Manager */}
+              <div className="space-y-2 md:col-span-2 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Monitor className="w-4 h-4 text-foreground" />
+                    <label className="font-bold text-xs text-foreground uppercase tracking-tight">
+                      Platforms Supported
+                    </label>
+                  </div>
+                  <Link
+                    href="/admin/platforms"
+                    target="_blank"
+                    className="text-[11px] font-semibold text-zinc-900 dark:text-zinc-100 hover:underline flex items-center gap-1"
+                  >
+                    <span>+ Manage / Add Platforms</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </Link>
+                </div>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {availablePlatforms.map((plat) => {
                     const isSelected = (formData.platform_ids || []).includes(plat.id);
                     return (
                       <button
@@ -1010,10 +1052,17 @@ export default function AdminFirmsPage() {
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all ${
                           isSelected
                             ? 'bg-black text-white dark:bg-white dark:text-black border-black dark:border-white shadow-2xs'
-                            : 'bg-zinc-50 dark:bg-zinc-900 text-muted-foreground border-zinc-200 dark:border-zinc-800 hover:border-foreground'
+                            : 'bg-white dark:bg-card text-muted-foreground border-zinc-200 dark:border-zinc-800 hover:border-foreground'
                         }`}
                       >
-                        <img src={plat.icon} alt={plat.name} className="w-4 h-4 object-contain rounded" />
+                        <img
+                          src={plat.logo || '/platforms/mt5.png'}
+                          alt={plat.name}
+                          className="w-4 h-4 object-contain rounded"
+                          onError={(e) => {
+                            (e.target as any).src = '/platforms/mt5.png';
+                          }}
+                        />
                         <span>{plat.name}</span>
                         {isSelected && <Check className="w-3.5 h-3.5 ml-0.5" />}
                       </button>
@@ -1052,18 +1101,226 @@ export default function AdminFirmsPage() {
                 </div>
               </div>
 
-              {/* ADDITIONAL FIRM RULES & SPECS */}
-              <div className="space-y-1">
-                <label className="font-semibold text-foreground">Consistency Rule</label>
-                <input
-                  type="text"
-                  value={formData.consistency_rule || ''}
-                  onChange={(e) => setFormData({ ...formData, consistency_rule: e.target.value })}
-                  placeholder="e.g. No strict consistency rule, or Max 30% daily"
-                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-none focus:border-foreground"
-                />
+              {/* CONSISTENCY & MIN TRADING DAYS (Syncs to Compare & Firm Profile) */}
+              <div className="space-y-4 md:col-span-2 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                    <label className="font-bold text-xs text-foreground uppercase tracking-tight">
+                      Consistency Rule & Minimum Trading Days (Syncs to Compare & Profile)
+                    </label>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">
+                    Numbers or sentences like: 35% in 1 Step and 45% in 2-Step
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-xs text-foreground block">
+                      Consistency Rule Summary *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.consistency_rule || ''}
+                      onChange={(e) => setFormData({ ...formData, consistency_rule: e.target.value })}
+                      placeholder="e.g. 35% in 1 Step and 45% in 2-Step, or No strict consistency rule"
+                      className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-foreground focus:outline-none focus:border-foreground"
+                    />
+                    <span className="text-[10px] text-muted-foreground">
+                      Compare page automatically extracts percentages and step scores from numbers or sentences.
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-semibold text-xs text-foreground block">
+                      Minimum Trading Days *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.min_trading_days ?? 0}
+                      onChange={(e) => setFormData({ ...formData, min_trading_days: e.target.value })}
+                      placeholder="e.g. 0 Days (No Min), 0, 3, or 5 Days"
+                      className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-foreground focus:outline-none focus:border-foreground font-mono font-bold"
+                    />
+                    <span className="text-[10px] text-muted-foreground">
+                      Enter 0 or 0 Days for no minimum days requirement (score 100/100).
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="font-semibold text-xs text-foreground block">
+                      Consistency Rule Full Description
+                    </label>
+                    <textarea
+                      value={formData.consistency_rules_content || ''}
+                      onChange={(e) => setFormData({ ...formData, consistency_rules_content: e.target.value })}
+                      rows={2}
+                      placeholder="Detailed explanation of lot size, risk consistency, or trading style guidelines..."
+                      className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-xs text-foreground focus:outline-none focus:border-foreground"
+                    />
+                  </div>
+
+                  {/* Article Link for Consistency Rule (Point 3 - Minimal rules link) */}
+                  <div className="space-y-1">
+                    <label className="font-semibold text-xs text-muted-foreground block">
+                      Consistency Rule Article Title (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.consistency_rule_article_title || ''}
+                      onChange={(e) => setFormData({ ...formData, consistency_rule_article_title: e.target.value })}
+                      placeholder="e.g. Read Consistency Policy & Examples"
+                      className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-foreground focus:outline-none focus:border-foreground"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-semibold text-xs text-muted-foreground block">
+                      Consistency Rule Article URL (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.consistency_rule_article_url || ''}
+                      onChange={(e) => setFormData({ ...formData, consistency_rule_article_url: e.target.value })}
+                      placeholder="https://... or /blog/..."
+                      className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-foreground font-mono focus:outline-none focus:border-foreground"
+                    />
+                  </div>
+                </div>
               </div>
 
+              {/* EVALUATION & DRAWDOWN RULES WITH ARTICLE LINK */}
+              <div className="space-y-4 md:col-span-2 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-amber-500" />
+                    <label className="font-bold text-xs text-foreground uppercase tracking-tight">
+                      Evaluation & Drawdown Rules
+                    </label>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">Keep it minimal with optional article link</span>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-xs text-foreground block">
+                      Drawdown Rules Content
+                    </label>
+                    <textarea
+                      value={formData.firm_rules_content || ''}
+                      onChange={(e) => setFormData({ ...formData, firm_rules_content: e.target.value })}
+                      rows={2}
+                      placeholder="Maximum daily drawdown calculated based on previous day balance or equity..."
+                      className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-xs text-foreground focus:outline-none focus:border-foreground"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="font-semibold text-xs text-muted-foreground block">
+                        Drawdown Article Title (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.firm_rules_article_title || ''}
+                        onChange={(e) => setFormData({ ...formData, firm_rules_article_title: e.target.value })}
+                        placeholder="e.g. Official Drawdown Calculation Guide"
+                        className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-foreground focus:outline-none focus:border-foreground"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="font-semibold text-xs text-muted-foreground block">
+                        Drawdown Article URL (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.firm_rules_article_url || ''}
+                        onChange={(e) => setFormData({ ...formData, firm_rules_article_url: e.target.value })}
+                        placeholder="https://... or /blog/..."
+                        className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-foreground font-mono focus:outline-none focus:border-foreground"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* EXTRA RULES & ARTICLES MANAGER (Point 3) */}
+              <div className="space-y-3 md:col-span-2 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Tag className="w-4 h-4 text-foreground" />
+                    <label className="font-bold text-xs text-foreground uppercase tracking-tight">
+                      Extra Rule Article Links (Minimal & Convenient)
+                    </label>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">Admin can link full articles for any extra rules</span>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex flex-col sm:flex-row items-center gap-2">
+                    <input
+                      type="text"
+                      value={newRuleArticleTitle}
+                      onChange={(e) => setNewRuleArticleTitle(e.target.value)}
+                      placeholder="Article Title (e.g. News Trading & Weekend Holding Policy)"
+                      className="flex-1 bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none"
+                    />
+                    <input
+                      type="text"
+                      value={newRuleArticleUrl}
+                      onChange={(e) => setNewRuleArticleUrl(e.target.value)}
+                      placeholder="Article URL (https://...)"
+                      className="flex-1 bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-foreground font-mono focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!newRuleArticleTitle.trim() || !newRuleArticleUrl.trim()) return;
+                        const current = formData.rule_articles || [];
+                        setFormData({
+                          ...formData,
+                          rule_articles: [...current, { title: newRuleArticleTitle.trim(), url: newRuleArticleUrl.trim() }],
+                        });
+                        setNewRuleArticleTitle('');
+                        setNewRuleArticleUrl('');
+                      }}
+                      className="px-4 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black font-semibold text-xs whitespace-nowrap cursor-pointer hover:opacity-90"
+                    >
+                      + Add Link
+                    </button>
+                  </div>
+
+                  {formData.rule_articles && formData.rule_articles.length > 0 && (
+                    <div className="space-y-1.5 pt-2">
+                      {formData.rule_articles.map((art, aIdx) => (
+                        <div
+                          key={aIdx}
+                          className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 text-xs"
+                        >
+                          <div className="flex items-center gap-2 truncate mr-2">
+                            <span className="font-semibold text-foreground truncate">{art.title}</span>
+                            <span className="text-[11px] font-mono text-muted-foreground truncate">{art.url}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = (formData.rule_articles || []).filter((_, i) => i !== aIdx);
+                              setFormData({ ...formData, rule_articles: updated });
+                            }}
+                            className="text-muted-foreground hover:text-red-500 p-1 cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* PAYOUT & LEVERAGE */}
               <div className="space-y-1">
                 <label className="font-semibold text-foreground">Payout Cycle</label>
                 <input

@@ -34,11 +34,17 @@ export interface Firm {
   min_price?: number;
   consistency_rules_content?: string;
   consistency_rule?: string;
+  consistency_rule_article_title?: string;
+  consistency_rule_article_url?: string;
+  min_trading_days?: number | string;
   payout_cycle?: string;
   payout_split_pct?: number | string;
   leverage?: string;
   firm_types?: string[];
   firm_rules_content?: string;
+  firm_rules_article_title?: string;
+  firm_rules_article_url?: string;
+  rule_articles?: Array<{ title: string; url: string }>;
   restricted_countries?: string[];
   restricted_jurisdictions?: string[];
   payout_programs?: Array<{ name: string; schedule: string; split: string }>;

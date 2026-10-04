@@ -36,8 +36,11 @@ import { calculateFirmMetrics } from '@/lib/utils/rating-calculator';
 import {
   calculateFirmComparisonScores,
   calculateChallengeComparisonScores,
+  parseConsistencyRule,
+  parseMinTradingDays,
   ComparisonMetricScore,
 } from '@/lib/utils/comparison-calc';
+import { getStoredPlatforms, PlatformItem } from '@/lib/utils/platforms-store';
 import { RadarChart } from '@/components/ui/radar-chart';
 import {
   Tooltip,
@@ -107,6 +110,13 @@ export function CompareClient() {
     return [];
   });
 
+  const [storedPlatforms, setStoredPlatforms] = useState<PlatformItem[]>(() => {
+    if (typeof window !== 'undefined') {
+      return getStoredPlatforms();
+    }
+    return [];
+  });
+
   useEffect(() => {
     async function loadCompareData() {
       try {
@@ -134,6 +144,29 @@ export function CompareClient() {
       }
     }
     loadCompareData();
+
+    function handlePlatformsChanged(e: any) {
+      if (e.detail) {
+        setStoredPlatforms(e.detail);
+      } else {
+        setStoredPlatforms(getStoredPlatforms());
+      }
+    }
+    function handleFirmsChanged(e: any) {
+      if (e.detail) {
+        setDbFirms(e.detail);
+      } else {
+        setDbFirms(getStoredFirms());
+      }
+    }
+
+    window.addEventListener('empirial_platforms_changed', handlePlatformsChanged);
+    window.addEventListener('empirial_firms_changed', handleFirmsChanged);
+
+    return () => {
+      window.removeEventListener('empirial_platforms_changed', handlePlatformsChanged);
+      window.removeEventListener('empirial_firms_changed', handleFirmsChanged);
+    };
   }, []);
 
   // Close dropdown on outside click or Escape
@@ -811,7 +844,7 @@ export function CompareClient() {
                     })}
                   </tr>
 
-                  {/* Option 6: Platforms (Small Logos from public/platforms with Tooltips) */}
+                  {/* Option 6: Platforms (Dynamic lookup with tooltips) */}
                   <tr>
                     <td className="p-4 sm:p-5 font-bold text-foreground bg-zinc-50/40 dark:bg-zinc-900/30">
                       Platforms
@@ -835,12 +868,16 @@ export function CompareClient() {
                         <td key={item.id} className="p-4 sm:p-5">
                           <div className="flex flex-wrap items-center gap-1.5">
                             {platformIds.map((pid, pIdx) => {
-                              const pInfo =
-                                PLATFORM_DATA[pid] ||
-                                Object.entries(PLATFORM_DATA).find(([k]) => pid.includes(k))?.[1] || {
-                                  name: pid.toUpperCase(),
-                                  icon: '/platforms/mt5.png',
-                                };
+                              const dynamicPlat = storedPlatforms.find(
+                                (p) => p.id === pid || p.id === pid.toLowerCase() || p.name.toLowerCase() === pid.toLowerCase()
+                              );
+                              const pInfo = dynamicPlat
+                                ? { name: dynamicPlat.name, icon: dynamicPlat.logo || dynamicPlat.logo_url || '/platforms/mt5.png' }
+                                : PLATFORM_DATA[pid] ||
+                                  Object.entries(PLATFORM_DATA).find(([k]) => pid.includes(k))?.[1] || {
+                                    name: pid.toUpperCase(),
+                                    icon: '/platforms/mt5.png',
+                                  };
 
                               return (
                                 <Tooltip key={pIdx}>
@@ -865,32 +902,87 @@ export function CompareClient() {
                     })}
                   </tr>
 
-                  {/* Option 7: Consistency & Min Days (Side-by-side) */}
+                  {/* Option 7: Consistency & Min Days (Side-by-side with step-specific scenarios & minimal article links) */}
                   <tr>
                     <td className="p-4 sm:p-5 font-bold text-foreground bg-zinc-50/40 dark:bg-zinc-900/30">
                       Consistency & Min Days
                     </td>
                     {(compareMode === 'firms' ? selectedFirms : selectedChallenges).map((item) => {
-                      const consistency =
-                        'consistency_rule' in item && (item as Challenge).consistency_rule
-                          ? (item as Challenge).consistency_rule
-                          : 'consistency_rules_content' in item
-                          ? (item as Firm).consistency_rules_content?.substring(0, 45) + '...'
-                          : 'No Consistency Rule';
-                      const minDays =
-                        'min_trading_days' in item
-                          ? (item as Challenge).min_trading_days
+                      // 1. Resolve raw consistency text
+                      const rawConsistency =
+                        'consistency_rule' in item && (item as any).consistency_rule
+                          ? (item as any).consistency_rule
+                          : 'consistency_rules_content' in item && (item as any).consistency_rules_content
+                          ? (item as any).consistency_rules_content
+                          : '';
+                      const targetStep = 'steps' in item ? (item as Challenge).steps : undefined;
+                      const parsedConsistency = parseConsistencyRule(rawConsistency, targetStep);
+
+                      // 2. Resolve raw min trading days
+                      const rawMinDays =
+                        'min_trading_days' in item && (item as any).min_trading_days !== undefined
+                          ? (item as any).min_trading_days
                           : 'firm_rules_content' in item && (item as Firm).firm_rules_content?.toLowerCase().includes('no minimum')
                           ? 0
-                          : 3;
+                          : undefined;
+                      const parsedMinDays = parseMinTradingDays(rawMinDays);
+
+                      // 3. Optional minimal rule articles
+                      const consistencyArticleUrl = 'consistency_rule_article_url' in item ? (item as Firm).consistency_rule_article_url : undefined;
+                      const consistencyArticleTitle = 'consistency_rule_article_title' in item ? (item as Firm).consistency_rule_article_title : undefined;
+                      const minDaysArticleUrl = 'firm_rules_article_url' in item ? (item as Firm).firm_rules_article_url : undefined;
+                      const minDaysArticleTitle = 'firm_rules_article_title' in item ? (item as Firm).firm_rules_article_title : undefined;
 
                       return (
-                        <td key={item.id} className="p-4 sm:p-5 space-y-1">
-                          <div className="text-[11px] font-semibold text-foreground">
-                            Consistency: <span className="font-bold">{consistency}</span>
+                        <td key={item.id} className="p-4 sm:p-5 space-y-2">
+                          <div>
+                            <div className="flex items-center justify-between gap-1 text-[11px] font-semibold text-foreground">
+                              <span className="text-muted-foreground">Consistency:</span>
+                              <span className="font-extrabold text-foreground">{parsedConsistency.displayValue}</span>
+                            </div>
+                            {/* If multi-step scenario is detected, render separate step badges */}
+                            {parsedConsistency.stepNumbers && Object.keys(parsedConsistency.stepNumbers).length > 1 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {Object.entries(parsedConsistency.stepNumbers).map(([st, val]) => (
+                                  <span
+                                    key={st}
+                                    className="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-[10px] font-mono font-bold text-foreground"
+                                  >
+                                    {st}-Step: {val}%
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {/* Minimal article link if provided */}
+                            {consistencyArticleUrl && (
+                              <a
+                                href={consistencyArticleUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-foreground underline underline-offset-2 mt-0.5 cursor-pointer"
+                              >
+                                <span>{consistencyArticleTitle || 'Rule article'}</span>
+                                <ExternalLink className="w-2.5 h-2.5" />
+                              </a>
+                            )}
                           </div>
-                          <div className="text-[11px] font-semibold text-foreground">
-                            Min Days: <span className="font-bold">{minDays === 0 ? '0 Days (No Min)' : `${minDays} Days`}</span>
+
+                          <div className="pt-1.5 border-t border-zinc-100 dark:border-zinc-800/80">
+                            <div className="flex items-center justify-between gap-1 text-[11px] font-semibold text-foreground">
+                              <span className="text-muted-foreground">Min Days:</span>
+                              <span className="font-extrabold text-foreground">{parsedMinDays.displayValue}</span>
+                            </div>
+                            {minDaysArticleUrl && (
+                              <a
+                                href={minDaysArticleUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-foreground underline underline-offset-2 mt-0.5 cursor-pointer"
+                              >
+                                <span>{minDaysArticleTitle || 'Min days article'}</span>
+                                <ExternalLink className="w-2.5 h-2.5" />
+                              </a>
+                            )}
                           </div>
                         </td>
                       );
