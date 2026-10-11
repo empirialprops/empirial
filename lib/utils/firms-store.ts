@@ -17,13 +17,6 @@ export function getStoredFirms(): Firm[] {
       if (Array.isArray(parsed) && parsed.length > 0) {
         // Strip out unadded default firms
         parsed = parsed.filter(f => f.id !== 'ftmo' && f.id !== 'funding-pips' && f.slug !== 'ftmo' && f.slug !== 'funding-pips');
-        
-        // Ensure authentic MOCK_FIRMS exist
-        const existingIds = new Set(parsed.map(f => f.id));
-        const missingMocks = MOCK_FIRMS.filter(m => !existingIds.has(m.id));
-        if (missingMocks.length > 0) {
-          parsed = [...parsed, ...missingMocks];
-        }
         return parsed;
       }
     }

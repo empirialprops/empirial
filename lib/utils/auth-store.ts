@@ -118,7 +118,6 @@ export const DEMO_ADMIN: UserProfile = {
   displayName: 'System Admin',
   phoneNumber: '',
   role: 'admin',
-  avatarUrl: undefined,
   traderId: 'EMP-ADM01',
   points: 0,
   accountsPurchased: [],
@@ -136,7 +135,6 @@ export const DEMO_TRADER: UserProfile = {
   displayName: 'Trader',
   phoneNumber: '',
   role: 'trader',
-  avatarUrl: undefined,
   traderId: 'EMP-00001',
   points: 0,
   accountsPurchased: [],
@@ -179,8 +177,11 @@ export function saveUser(user: UserProfile) {
   import('@/lib/firebase/config').then(({ db }) => {
     if (db) {
       import('firebase/firestore').then(({ doc, setDoc }) => {
+        const cleanUser = Object.fromEntries(
+          Object.entries(user).filter(([_, v]) => v !== undefined)
+        );
         const docRef = doc(db, 'users', user.uid);
-        setDoc(docRef, user, { merge: true }).catch((err) => {
+        setDoc(docRef, cleanUser, { merge: true }).catch((err) => {
           console.warn('Silent Firestore sync failed:', err);
         });
       });

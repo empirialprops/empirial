@@ -181,12 +181,17 @@ export function ReferralTracker() {
           return;
         }
         
-        // If a Discord Sandbox user session is active, do not wipe it
+        // If an Admin, Staff, or Discord Sandbox user session is active, do not wipe it
         const savedUserStr = localStorage.getItem('empirial_user');
         if (savedUserStr) {
           try {
             const savedUser = JSON.parse(savedUserStr);
-            if (savedUser && savedUser.uid && savedUser.uid.startsWith('discord:')) {
+            if (
+              savedUser &&
+              (['admin', 'super_admin', 'data_entry', 'reviews_support'].includes(savedUser.role) ||
+               savedUser.uid === 'admin-001' ||
+               (savedUser.uid && savedUser.uid.startsWith('discord:')))
+            ) {
               return;
             }
           } catch (e) {}

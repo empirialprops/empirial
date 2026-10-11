@@ -18,12 +18,6 @@ export function getStoredChallenges(): Challenge[] {
         // Strip out unadded default firms
         parsed = parsed.filter(c => c.firm_id !== 'ftmo' && c.firm_id !== 'funding-pips' && c.id !== 'ch-ftmo-100k' && c.id !== 'ch-pips-100k');
         
-        // Ensure authentic MOCK_CHALLENGES (e.g. dolvero) exist if not present
-        const existingIds = new Set(parsed.map(c => c.id));
-        const missingMocks = MOCK_CHALLENGES.filter(m => !existingIds.has(m.id));
-        if (missingMocks.length > 0) {
-          parsed = [...parsed, ...missingMocks];
-        }
         return parsed;
       }
     }

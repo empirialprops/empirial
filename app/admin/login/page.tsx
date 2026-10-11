@@ -35,7 +35,7 @@ export default function AdminLoginPage() {
 
   const handleLocalAdminLogin = () => {
     saveUser(DEMO_ADMIN);
-    router.replace('/admin');
+    window.location.href = '/admin';
   };
 
   const handleAutoRegister = async () => {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -29,6 +29,7 @@ import {
   Activity,
   TrendingUp,
   FileText,
+  FolderUp,
 } from 'lucide-react';
 
 interface AdminNavItem {
@@ -49,7 +50,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const stored = getStoredUser();
     return stored && STAFF_ROLES.includes(stored.role) ? stored : null;
   });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    const stored = getStoredUser();
+    return !(stored && STAFF_ROLES.includes(stored.role));
+  });
 
   const syncUserSession = useCallback(() => {
     const storedUser = getStoredUser();
@@ -119,13 +123,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         } catch (err) {
           console.error('Error verifying whitelist:', err);
           const fallback = getStoredUser();
-          if (!fallback || !STAFF_ROLES.includes(fallback.role)) {
+          if (fallback && STAFF_ROLES.includes(fallback.role)) {
+            setCurrentUser(fallback);
+          } else {
             setCurrentUser(null);
           }
         }
       } else {
         const fallback = getStoredUser();
-        if (!fallback || !STAFF_ROLES.includes(fallback.role)) {
+        if (fallback && STAFF_ROLES.includes(fallback.role)) {
+          setCurrentUser(fallback);
+        } else {
           setCurrentUser(null);
         }
       }
@@ -142,6 +150,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const allNavItems: AdminNavItem[] = [
     { name: 'Dashboard Overview', href: '/admin', icon: LayoutDashboard, roles: ['admin', 'super_admin', 'data_entry', 'reviews_support'] },
     { name: 'Prop Firms Directory', href: '/admin/firms', icon: Building2, roles: ['admin', 'super_admin', 'data_entry'], permission: 'manage_firms' },
+    { name: 'Firms File System', href: '/admin/file-system', icon: FolderUp, badge: 'Import', roles: ['admin', 'super_admin', 'data_entry'], permission: 'manage_firms' },
     { name: 'Trading Platforms', href: '/admin/platforms', icon: Monitor, badge: 'New', roles: ['admin', 'super_admin', 'data_entry'], permission: 'manage_platforms' },
     { name: 'Evaluation Challenges', href: '/admin/challenges', icon: Trophy, badge: 'Portal', roles: ['admin', 'super_admin', 'data_entry'], permission: 'manage_challenges' },
     { name: 'Discount Promo Deals', href: '/admin/deals', icon: Tag, roles: ['admin', 'super_admin', 'data_entry'], permission: 'manage_deals' },
@@ -160,13 +169,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   ];
 
   const userRole = currentUser?.role || 'admin';
-  const allowedNav = allNavItems.filter((item) => {
-    if (userRole === 'admin' || userRole === 'super_admin') return true;
-    if (item.permission && currentUser) {
-      return hasStaffPermission(currentUser, item.permission);
-    }
-    return item.roles.includes(userRole);
-  });
+  const allowedNav = useMemo(() => {
+    return allNavItems.filter((item) => {
+      if (userRole === 'admin' || userRole === 'super_admin') return true;
+      if (item.permission && currentUser) {
+        return hasStaffPermission(currentUser, item.permission);
+      }
+      return item.roles.includes(userRole);
+    });
+  }, [userRole, currentUser]);
 
   // Route protection
   useEffect(() => {

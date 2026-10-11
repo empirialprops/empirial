@@ -24,6 +24,7 @@ import {
   Tag,
   Filter,
   Monitor,
+  FolderUp,
 } from 'lucide-react';
 import Link from 'next/link';
 import { MOCK_FIRMS } from '@/lib/data/firms-data';
@@ -518,6 +519,13 @@ export default function AdminFirmsPage() {
             <Check className="w-4 h-4" />
             <span>Save Changes</span>
           </button>
+          <Link
+            href="/admin/file-system"
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-card dark:text-foreground text-xs font-semibold cursor-pointer shadow-2xs"
+          >
+            <FolderUp className="w-4 h-4" />
+            <span>Firms File System</span>
+          </Link>
           <button
             type="button"
             onClick={() => setShowFilterManager(!showFilterManager)}

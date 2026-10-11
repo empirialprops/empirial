@@ -6,6 +6,7 @@ import NavBar from '@/components/navbar';
 import { OfferPosterModal } from '@/components/offer-poster-modal';
 import { ReferralTracker } from '@/components/referral-tracker';
 import { BrandingSync } from '@/components/branding-sync';
+import { TelemetryTracker } from '@/components/analytics/telemetry-tracker';
 
 import { JsonLd, getOrganizationSchema } from '@/components/seo/json-ld';
 
@@ -76,7 +77,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="bg-background text-foreground antialiased min-h-screen flex flex-col transition-colors duration-200">
+      <body
+        className="bg-background text-foreground antialiased min-h-screen flex flex-col transition-colors duration-200"
+        suppressHydrationWarning
+      >
         {/* Google Analytics (gtag.js) */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-S8LMTLWN4G"
@@ -104,6 +108,9 @@ export default function RootLayout({
 
           {/* Referral & Session Synchronizer */}
           <ReferralTracker />
+
+          {/* Telemetry & User Analytics Tracker */}
+          <TelemetryTracker />
 
           {/* Global Navigation */}
           <NavBar />

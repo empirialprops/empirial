@@ -1257,8 +1257,8 @@ export async function getLivePlatformStats(): Promise<{
 
     return {
       activeTraders: usersCount,
-      verifiedFirms: firmsCount > 0 ? firmsCount : 7,
-      challenges: challsCount > 0 ? challsCount : 42,
+      verifiedFirms: firmsCount,
+      challenges: challsCount,
       reviews: postedRevsCount,
     };
   } catch (err) {

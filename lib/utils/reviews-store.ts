@@ -17,13 +17,6 @@ export function getStoredReviews(): Review[] {
       if (Array.isArray(parsed) && parsed.length > 0) {
         // Strip out unadded default firms
         parsed = parsed.filter(r => r.firm_id !== 'ftmo' && r.firm_id !== 'funding-pips');
-        
-        // Ensure authentic MOCK_REVIEWS exist
-        const existingIds = new Set(parsed.map(r => r.id));
-        const missingMocks = MOCK_REVIEWS.filter(m => !existingIds.has(m.id));
-        if (missingMocks.length > 0) {
-          parsed = [...parsed, ...missingMocks];
-        }
         return parsed;
       }
     }

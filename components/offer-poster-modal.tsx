@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Sparkles, Tag, ArrowRight, Check, Copy } from 'lucide-react';
 import {
@@ -12,11 +13,13 @@ import {
 const SESSION_DISMISSED_KEY = 'empirial_offer_poster_session_seen';
 
 export function OfferPosterModal() {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [config, setConfig] = useState<OfferPosterConfig>(DEFAULT_OFFER_POSTER);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    if (pathname?.startsWith('/admin')) return;
     // 1. Load initial local config
     const currentConfig = getStoredOfferPoster();
     setConfig(currentConfig);
@@ -107,7 +110,7 @@ export function OfferPosterModal() {
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || pathname?.startsWith('/admin')) return null;
 
   const isStacked = config.layoutStructure === 'stacked';
 
