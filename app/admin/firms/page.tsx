@@ -400,9 +400,9 @@ export default function AdminFirmsPage() {
       max_allocation: formData.max_allocation || '$2,000,000',
       profit_split_custom: formData.profit_split_custom || 'Up to 90%',
       payout_custom: formData.payout_custom || 'Bi-Weekly / 14 Days',
-      discount_label_custom: formData.discount_label_custom || '20% OFF',
+      discount_pct: parseNum(formData.discount_pct, 0),
+      discount_label_custom: formData.discount_label_custom || (formData.discount_pct ? `${formData.discount_pct}% OFF` : 'EXCLUSIVE'),
       coupon_code_custom: (formData.coupon_code_custom || 'EMPIRE').toUpperCase(),
-      discount_pct: parseNum(formData.discount_pct, 20),
       badge_custom: formData.badge_custom || '',
       platforms: formData.platforms || 'MT5, cTrader',
       platform_ids: formData.platform_ids || ['mt5', 'ctrader'],
@@ -962,12 +962,32 @@ export default function AdminFirmsPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="font-semibold text-foreground">Discount Label (e.g. 20% OFF)</label>
+                <label className="font-semibold text-foreground">Discount Percentage (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={formData.discount_pct ?? ''}
+                  onChange={(e) => {
+                    const num = e.target.value === '' ? 0 : Number(e.target.value);
+                    setFormData({
+                      ...formData,
+                      discount_pct: num,
+                      discount_label_custom: num > 0 ? `${num}% OFF` : formData.discount_label_custom,
+                    });
+                  }}
+                  placeholder="e.g. 50"
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-none focus:border-foreground font-mono"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Discount Label (e.g. 50% OFF)</label>
                 <input
                   type="text"
                   value={formData.discount_label_custom || ''}
                   onChange={(e) => setFormData({ ...formData, discount_label_custom: e.target.value })}
-                  placeholder="e.g. 20% OFF"
+                  placeholder="e.g. 50% OFF"
                   className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-none focus:border-foreground"
                 />
               </div>

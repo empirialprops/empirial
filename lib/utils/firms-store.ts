@@ -21,8 +21,22 @@ export function getStoredFirms(): Firm[] {
         // Auto-merge any newly added mock firms (e.g. Orion Funded)
         const existingIds = new Set(parsed.map(f => f.id));
         const missingMockFirms = MOCK_FIRMS.filter(f => !existingIds.has(f.id));
+        let shouldSyncFirms = false;
         if (missingMockFirms.length > 0) {
           parsed = [...parsed, ...missingMockFirms];
+          shouldSyncFirms = true;
+        }
+
+        // Upgrade Orion firm if stored with previous 15% discount
+        parsed = parsed.map(f => {
+          if (f.id === 'orion-funded' && (f.discount_pct === 15 || f.discount_label_custom === 'SPECIAL OFFER')) {
+            shouldSyncFirms = true;
+            return { ...f, discount_pct: 50, discount_label_custom: '50% OFF', coupon_code_custom: 'EMPIRIAL' };
+          }
+          return f;
+        });
+
+        if (shouldSyncFirms) {
           saveStoredFirms(parsed);
         }
         return parsed;

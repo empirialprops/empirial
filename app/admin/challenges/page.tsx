@@ -23,6 +23,10 @@ import {
   CheckSquare,
   Square,
   Sparkles,
+  SlidersHorizontal,
+  ArrowRight,
+  AlertCircle,
+  CheckCircle2,
 } from 'lucide-react';
 import { MOCK_CHALLENGES } from '@/lib/data/challenges-data';
 import { MOCK_FIRMS } from '@/lib/data/firms-data';
@@ -34,7 +38,10 @@ import {
   updateChallenge,
   deleteChallenge,
   deleteChallengesBatch,
+  updateFirm,
 } from '@/lib/firebase/services';
+import { saveStoredChallenges } from '@/lib/utils/challenges-store';
+import { updateStoredFirm } from '@/lib/utils/firms-store';
 import { logAdminAction } from '@/lib/utils/audit-log-store';
 import BatchChallengePortal from '@/components/admin/BatchChallengePortal';
 
@@ -51,6 +58,30 @@ export default function AdminChallengesPage() {
 
   // Multi-selection for bulk delete
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Bulk Edit by Firm State
+  const [isBulkEditModalOpen, setIsBulkEditModalOpen] = useState(false);
+  const [bulkTargetFirmId, setBulkTargetFirmId] = useState<string>('');
+  const [bulkScope, setBulkScope] = useState<'all' | 'selected'>('all');
+  const [bulkEnableDiscount, setBulkEnableDiscount] = useState(true);
+  const [bulkDiscountPct, setBulkDiscountPct] = useState<number>(50);
+  const [bulkAutoRecalculatePrices, setBulkAutoRecalculatePrices] = useState(true);
+  const [bulkApplyToPrice, setBulkApplyToPrice] = useState(true);
+  const [bulkEnableCoupon, setBulkEnableCoupon] = useState(true);
+  const [bulkCouponCode, setBulkCouponCode] = useState<string>('EMPIRIAL');
+  const [bulkEnableBuyUrl, setBulkEnableBuyUrl] = useState(false);
+  const [bulkBuyUrl, setBulkBuyUrl] = useState<string>('');
+  const [bulkEnableProfitSplit, setBulkEnableProfitSplit] = useState(false);
+  const [bulkProfitSplit, setBulkProfitSplit] = useState<number>(80);
+  const [bulkEnablePayoutFreq, setBulkEnablePayoutFreq] = useState(false);
+  const [bulkPayoutFreq, setBulkPayoutFreq] = useState<string>('Bi-Weekly / 14 Days');
+  const [bulkEnableLeverage, setBulkEnableLeverage] = useState(false);
+  const [bulkLeverage, setBulkLeverage] = useState<string>('1:100');
+  const [bulkSyncFirmProfile, setBulkSyncFirmProfile] = useState(true);
+  const [bulkFeaturedMode, setBulkFeaturedMode] = useState<'keep' | 'set_true' | 'set_false'>('keep');
+  const [bulkBestSellerMode, setBulkBestSellerMode] = useState<'keep' | 'set_true' | 'set_false'>('keep');
+  const [isBulkApplying, setIsBulkApplying] = useState(false);
+  const [bulkFeedback, setBulkFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Single Modal State
   const [isAdding, setIsAdding] = useState(false);
@@ -271,6 +302,236 @@ export default function AdminChallengesPage() {
     }
   };
 
+  const handleOpenBulkFirmEdit = (targetFirmId?: string) => {
+    const resolvedFirmId =
+      targetFirmId ||
+      (selectedFirmFilter !== 'all' ? selectedFirmFilter : '') ||
+      (firms.some((f) => f.id === 'orion-funded') ? 'orion-funded' : firms[0]?.id || '');
+
+    const targetFirm = firms.find((f) => f.id === resolvedFirmId);
+    setBulkTargetFirmId(resolvedFirmId);
+
+    const selectedBelongingToFirm = selectedIds.filter((id) => {
+      const ch = challenges.find((c) => c.id === id);
+      return ch?.firm_id === resolvedFirmId;
+    });
+
+    if (selectedBelongingToFirm.length > 0 && selectedIds.length === selectedBelongingToFirm.length) {
+      setBulkScope('selected');
+    } else {
+      setBulkScope('all');
+    }
+
+    const initialDiscount =
+      resolvedFirmId === 'orion-funded' ? 50 : targetFirm?.discount_pct || 20;
+    setBulkDiscountPct(initialDiscount);
+    setBulkEnableDiscount(true);
+    setBulkAutoRecalculatePrices(true);
+    setBulkApplyToPrice(true);
+
+    const initialCoupon =
+      resolvedFirmId === 'orion-funded'
+        ? 'EMPIRIAL'
+        : targetFirm?.coupon_code_custom || 'EMPIRE';
+    setBulkCouponCode(initialCoupon);
+    setBulkEnableCoupon(true);
+
+    setBulkBuyUrl(targetFirm?.buy_url || '');
+    setBulkEnableBuyUrl(false);
+
+    setBulkProfitSplit(80);
+    setBulkEnableProfitSplit(false);
+    setBulkPayoutFreq('Bi-Weekly / 14 Days');
+    setBulkEnablePayoutFreq(false);
+    setBulkLeverage('1:100');
+    setBulkEnableLeverage(false);
+    setBulkFeaturedMode('keep');
+    setBulkBestSellerMode('keep');
+    setBulkSyncFirmProfile(true);
+    setBulkFeedback(null);
+    setIsBulkEditModalOpen(true);
+  };
+
+  const targetChallengesForBulkEdit = useMemo(() => {
+    if (!bulkTargetFirmId) return [];
+    return challenges.filter((c) => {
+      if (c.firm_id !== bulkTargetFirmId) return false;
+      if (bulkScope === 'selected') {
+        return selectedIds.includes(c.id);
+      }
+      return true;
+    });
+  }, [challenges, bulkTargetFirmId, bulkScope, selectedIds]);
+
+  const previewChallenges = useMemo(() => {
+    return targetChallengesForBulkEdit.map((ch) => {
+      const origPrice = ch.original_price || ch.price;
+      const targetDiscount = bulkEnableDiscount ? bulkDiscountPct : (ch.discount_pct || 0);
+
+      let newPrice = ch.price;
+      let newDiscountedPrice = ch.discounted_price || ch.price;
+
+      if (bulkEnableDiscount && bulkAutoRecalculatePrices) {
+        const calculatedDiscountPrice = Math.max(1, Math.round(origPrice * (1 - targetDiscount / 100)));
+        newDiscountedPrice = calculatedDiscountPrice;
+        if (bulkApplyToPrice) {
+          newPrice = calculatedDiscountPrice;
+        }
+      }
+
+      const newCoupon = bulkEnableCoupon ? bulkCouponCode.trim().toUpperCase() : ch.coupon_code;
+      const newBuyUrl = bulkEnableBuyUrl && bulkBuyUrl.trim() ? bulkBuyUrl.trim() : ch.buy_url;
+      const newProfitSplit = bulkEnableProfitSplit ? bulkProfitSplit : ch.profit_split_pct;
+      const newPayoutFreq = bulkEnablePayoutFreq && bulkPayoutFreq ? bulkPayoutFreq : ch.payout_frequency;
+      const newLeverage = bulkEnableLeverage && bulkLeverage ? bulkLeverage : ch.leverage;
+      const newFeatured =
+        bulkFeaturedMode === 'set_true' ? true : bulkFeaturedMode === 'set_false' ? false : ch.is_featured;
+      const newBestSeller =
+        bulkBestSellerMode === 'set_true' ? true : bulkBestSellerMode === 'set_false' ? false : ch.is_best_seller;
+
+      const updates: Partial<Challenge> = {
+        ...(bulkEnableDiscount ? { discount_pct: targetDiscount, discounted_price: newDiscountedPrice } : {}),
+        ...(bulkEnableDiscount && bulkAutoRecalculatePrices && bulkApplyToPrice ? { price: newPrice } : {}),
+        ...(bulkEnableCoupon ? { coupon_code: newCoupon } : {}),
+        ...(bulkEnableBuyUrl && bulkBuyUrl.trim() ? { buy_url: newBuyUrl } : {}),
+        ...(bulkEnableProfitSplit ? { profit_split_pct: newProfitSplit } : {}),
+        ...(bulkEnablePayoutFreq && bulkPayoutFreq ? { payout_frequency: newPayoutFreq } : {}),
+        ...(bulkEnableLeverage && bulkLeverage ? { leverage: newLeverage } : {}),
+        ...(bulkFeaturedMode !== 'keep' ? { is_featured: newFeatured } : {}),
+        ...(bulkBestSellerMode !== 'keep' ? { is_best_seller: newBestSeller } : {}),
+      };
+
+      return {
+        id: ch.id,
+        name: ch.name,
+        account_size: ch.account_size,
+        origPrice,
+        oldPrice: ch.price,
+        oldDiscount: ch.discount_pct || 0,
+        oldCoupon: ch.coupon_code,
+        newPrice,
+        newDiscount: targetDiscount,
+        newDiscountedPrice,
+        newCoupon,
+        savings: origPrice - newPrice,
+        updates,
+      };
+    });
+  }, [
+    targetChallengesForBulkEdit,
+    bulkEnableDiscount,
+    bulkDiscountPct,
+    bulkAutoRecalculatePrices,
+    bulkApplyToPrice,
+    bulkEnableCoupon,
+    bulkCouponCode,
+    bulkEnableBuyUrl,
+    bulkBuyUrl,
+    bulkEnableProfitSplit,
+    bulkProfitSplit,
+    bulkEnablePayoutFreq,
+    bulkPayoutFreq,
+    bulkEnableLeverage,
+    bulkLeverage,
+    bulkFeaturedMode,
+    bulkBestSellerMode,
+  ]);
+
+  const handleApplyBulkFirmUpdate = async () => {
+    if (previewChallenges.length === 0) {
+      alert('No challenges found to update for the selected firm and scope.');
+      return;
+    }
+
+    setIsBulkApplying(true);
+    setBulkFeedback(null);
+
+    const targetFirm = firms.find((f) => f.id === bulkTargetFirmId);
+    const firmName = targetFirm?.name || bulkTargetFirmId;
+
+    try {
+      const updateMap = new Map<string, Partial<Challenge>>();
+      previewChallenges.forEach((item) => {
+        updateMap.set(item.id, item.updates);
+      });
+
+      const updatedChallenges = challenges.map((ch) => {
+        const patch = updateMap.get(ch.id);
+        if (patch) {
+          return { ...ch, ...patch };
+        }
+        return ch;
+      });
+
+      setChallenges(updatedChallenges);
+      saveStoredChallenges(updatedChallenges);
+
+      const updatePromises = previewChallenges.map((item) =>
+        updateChallenge(item.id, item.updates).catch((err) =>
+          console.warn(`Failed Firestore update for challenge ${item.id}:`, err)
+        )
+      );
+
+      if (bulkSyncFirmProfile && targetFirm) {
+        const firmUpdates: Partial<Firm> = {};
+        if (bulkEnableDiscount) {
+          firmUpdates.discount_pct = bulkDiscountPct;
+          firmUpdates.discount_label_custom = `${bulkDiscountPct}% OFF`;
+        }
+        if (bulkEnableCoupon) {
+          firmUpdates.coupon_code_custom = bulkCouponCode.trim().toUpperCase();
+        }
+        if (bulkEnableBuyUrl && bulkBuyUrl.trim()) {
+          firmUpdates.buy_url = bulkBuyUrl.trim();
+        }
+
+        if (Object.keys(firmUpdates).length > 0) {
+          updateStoredFirm(targetFirm.id, firmUpdates);
+          updateFirm(targetFirm.id, firmUpdates).catch((err) =>
+            console.warn(`Failed Firestore update for firm ${targetFirm.id}:`, err)
+          );
+          setFirms((prevFirms) =>
+            prevFirms.map((f) => (f.id === targetFirm.id ? { ...f, ...firmUpdates } : f))
+          );
+        }
+      }
+
+      await Promise.allSettled(updatePromises);
+
+      logAdminAction({
+        action: `Bulk updated ${previewChallenges.length} challenges for ${firmName} (Discount: ${bulkEnableDiscount ? `${bulkDiscountPct}%` : 'unchanged'}, Coupon: ${bulkEnableCoupon ? bulkCouponCode : 'unchanged'})`,
+        module: 'challenges',
+        target_id: `bulk-${bulkTargetFirmId}-${Date.now()}`,
+        entity_name: `${firmName} (${previewChallenges.length} challenges)`,
+        previous_state: null,
+        new_state: {
+          firm_id: bulkTargetFirmId,
+          count: previewChallenges.length,
+          discount_pct: bulkEnableDiscount ? bulkDiscountPct : undefined,
+          coupon_code: bulkEnableCoupon ? bulkCouponCode : undefined,
+        },
+      });
+
+      setBulkFeedback({
+        type: 'success',
+        message: `Successfully updated ${previewChallenges.length} challenges for ${firmName}! All prices and discounts are now live across the platform.`,
+      });
+
+      setTimeout(() => {
+        setIsBulkEditModalOpen(false);
+        setBulkFeedback(null);
+      }, 1500);
+    } catch (err: any) {
+      console.error('Error during bulk challenges update:', err);
+      setBulkFeedback({
+        type: 'error',
+        message: `Failed to complete bulk update: ${err?.message || 'Unknown error'}`,
+      });
+    } finally {
+      setIsBulkApplying(false);
+    }
+  };
+
   const parseNum = (val: any, fallback: number): number => {
     if (val === undefined || val === null || val === '') return fallback;
     const num = typeof val === 'number' ? val : Number(val);
@@ -448,14 +709,25 @@ export default function AdminChallengesPage() {
 
         <div className="flex items-center gap-2">
           {activeTab === 'directory' && (
-            <button
-              type="button"
-              onClick={handleStartAdd}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-semibold cursor-pointer shadow-xs"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Single Challenge</span>
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => handleOpenBulkFirmEdit(selectedFirmFilter !== 'all' ? selectedFirmFilter : undefined)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-card dark:text-foreground text-xs font-semibold cursor-pointer shadow-xs transition-colors"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span>Bulk Edit by Firm</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleStartAdd}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-semibold cursor-pointer shadow-xs"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Single Challenge</span>
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -485,17 +757,40 @@ export default function AdminChallengesPage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {selectedIds.length > 0 && (
-                <button
-                  type="button"
-                  onClick={handleBulkDelete}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-colors cursor-pointer shadow-sm"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>Delete Selected ({selectedIds.length})</span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const firstSelected = challenges.find((c) => selectedIds.includes(c.id));
+                      handleOpenBulkFirmEdit(firstSelected?.firm_id);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-card dark:text-foreground text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                    <span>Bulk Edit Selected ({selectedIds.length})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleBulkDelete}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-colors cursor-pointer shadow-sm"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Delete Selected ({selectedIds.length})</span>
+                  </button>
+                </>
               )}
+
+              <button
+                type="button"
+                onClick={() => handleOpenBulkFirmEdit(selectedFirmFilter !== 'all' ? selectedFirmFilter : undefined)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-card dark:text-foreground text-xs font-semibold cursor-pointer shadow-xs transition-colors"
+              >
+                <Percent className="w-3.5 h-3.5" />
+                <span>Bulk Edit Firm Challenges</span>
+              </button>
 
               <button
                 type="button"
@@ -535,6 +830,18 @@ export default function AdminChallengesPage() {
                   </option>
                 ))}
               </select>
+
+              {selectedFirmFilter !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => handleOpenBulkFirmEdit(selectedFirmFilter)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-semibold cursor-pointer shadow-xs transition-colors"
+                  title="Bulk edit discounts & settings for this firm"
+                >
+                  <Percent className="w-3.5 h-3.5" />
+                  <span>Bulk Edit Firm</span>
+                </button>
+              )}
 
               {/* Steps Filter */}
               <select
@@ -1345,6 +1652,470 @@ export default function AdminChallengesPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* BULK EDIT FIRM CHALLENGES MODAL */}
+      {isBulkEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white dark:bg-card border border-zinc-200 dark:border-border rounded-3xl p-6 sm:p-8 max-w-4xl w-full space-y-6 shadow-2xl my-8 max-h-[92vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between border-b border-zinc-200 dark:border-zinc-800 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-black dark:bg-white text-white dark:text-black flex items-center justify-center shadow-xs">
+                    <Percent className="w-4 h-4" />
+                  </div>
+                  <h2 className="text-lg sm:text-xl font-bold text-foreground">
+                    Bulk Edit Challenges by Firm
+                  </h2>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Instantly batch update discount rates, auto-calculate new prices, override coupon codes, and synchronize firm data across all challenge accounts.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsBulkEditModalOpen(false)}
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Feedback Alert */}
+            {bulkFeedback && (
+              <div
+                className={`p-4 rounded-2xl flex items-center gap-3 text-xs font-semibold ${
+                  bulkFeedback.type === 'success'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
+                    : 'bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300'
+                }`}
+              >
+                {bulkFeedback.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                )}
+                <span>{bulkFeedback.message}</span>
+              </div>
+            )}
+
+            {/* Target Firm & Scope Selector */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-foreground block">
+                  Select Target Prop Firm
+                </label>
+                <select
+                  value={bulkTargetFirmId}
+                  onChange={(e) => {
+                    const newFirmId = e.target.value;
+                    setBulkTargetFirmId(newFirmId);
+                    const matched = firms.find((f) => f.id === newFirmId);
+                    if (newFirmId === 'orion-funded') {
+                      setBulkDiscountPct(50);
+                      setBulkCouponCode('EMPIRIAL');
+                    } else if (matched) {
+                      setBulkDiscountPct(matched.discount_pct || 20);
+                      setBulkCouponCode(matched.coupon_code_custom || 'EMPIRE');
+                    }
+                  }}
+                  className="w-full bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-xs font-semibold text-foreground focus:outline-none focus:border-foreground"
+                >
+                  {firms.map((f) => {
+                    const firmChallsCount = challenges.filter((c) => c.firm_id === f.id).length;
+                    return (
+                      <option key={f.id} value={f.id}>
+                        {f.name} ({firmChallsCount} challenges in directory)
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-foreground block">
+                  Application Scope
+                </label>
+                <div className="flex items-center gap-2 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setBulkScope('all')}
+                    className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                      bulkScope === 'all'
+                        ? 'bg-black text-white dark:bg-white dark:text-black border-black dark:border-white'
+                        : 'bg-white dark:bg-card border-zinc-200 dark:border-zinc-800 text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    All Firm Challenges ({challenges.filter((c) => c.firm_id === bulkTargetFirmId).length})
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setBulkScope('selected')}
+                    disabled={selectedIds.filter((id) => challenges.find((c) => c.id === id)?.firm_id === bulkTargetFirmId).length === 0}
+                    className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                      bulkScope === 'selected'
+                        ? 'bg-black text-white dark:bg-white dark:text-black border-black dark:border-white'
+                        : 'bg-white dark:bg-card border-zinc-200 dark:border-zinc-800 text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed'
+                    }`}
+                  >
+                    Selected Only ({selectedIds.filter((id) => challenges.find((c) => c.id === id)?.firm_id === bulkTargetFirmId).length})
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Configuration Tabs / Panels */}
+            <div className="space-y-4">
+              {/* SECTION 1: DISCOUNT & PRICE CALCULATION (MAIN FEATURE) */}
+              <div className="p-5 rounded-2xl bg-white dark:bg-card border border-zinc-200 dark:border-border space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Percent className="w-4 h-4 text-foreground" />
+                    <h3 className="text-sm font-bold text-foreground">
+                      Bulk Discount & Automated Price Recalculation
+                    </h3>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold">
+                    <input
+                      type="checkbox"
+                      checked={bulkEnableDiscount}
+                      onChange={(e) => setBulkEnableDiscount(e.target.checked)}
+                      className="rounded border-zinc-300 text-black dark:text-white"
+                    />
+                    <span>Apply Discount Updates</span>
+                  </label>
+                </div>
+
+                {bulkEnableDiscount && (
+                  <div className="space-y-3.5 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-foreground">
+                          Discount Percentage (%)
+                        </label>
+                        <span className="text-xs font-mono font-bold text-muted-foreground">
+                          Currently Set: {bulkDiscountPct}%
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={bulkDiscountPct}
+                          onChange={(e) => setBulkDiscountPct(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                          className="w-28 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono font-extrabold text-foreground focus:outline-none focus:border-foreground"
+                        />
+                        <div className="flex flex-wrap items-center gap-1.5 flex-1">
+                          {[
+                            { label: '15%', val: 15 },
+                            { label: '20%', val: 20 },
+                            { label: '25%', val: 25 },
+                            { label: '30%', val: 30 },
+                            { label: '40%', val: 40 },
+                            { label: '50% (EMPIRIAL)', val: 50 },
+                            { label: '60%', val: 60 },
+                          ].map((preset) => (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              onClick={() => setBulkDiscountPct(preset.val)}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+                                bulkDiscountPct === preset.val
+                                  ? 'bg-black text-white dark:bg-white dark:text-black font-extrabold shadow-2xs'
+                                  : 'bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-muted-foreground hover:text-foreground font-semibold'
+                              }`}
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                      <label className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={bulkAutoRecalculatePrices}
+                          onChange={(e) => setBulkAutoRecalculatePrices(e.target.checked)}
+                          className="mt-0.5 rounded border-zinc-300 text-black dark:text-white"
+                        />
+                        <div>
+                          <span className="text-xs font-bold text-foreground block">
+                            Auto-calculate Discounted Price
+                          </span>
+                          <span className="text-[11px] text-muted-foreground block">
+                            Calculates price as <code className="font-mono text-foreground font-semibold">original_price × (1 - {bulkDiscountPct}%)</code>
+                          </span>
+                        </div>
+                      </label>
+
+                      <label className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={bulkApplyToPrice}
+                          onChange={(e) => setBulkApplyToPrice(e.target.checked)}
+                          className="mt-0.5 rounded border-zinc-300 text-black dark:text-white"
+                        />
+                        <div>
+                          <span className="text-xs font-bold text-foreground block">
+                            Apply Directly to Display Price
+                          </span>
+                          <span className="text-[11px] text-muted-foreground block">
+                            Updates the main listing price so directory cards immediately showcase the 50% discount price.
+                          </span>
+                        </div>
+                      </label>
+                    </div>
+
+                    <label className="flex items-center gap-2 cursor-pointer pt-1 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={bulkSyncFirmProfile}
+                        onChange={(e) => setBulkSyncFirmProfile(e.target.checked)}
+                        className="rounded border-zinc-300 text-black dark:text-white"
+                      />
+                      <span className="font-semibold text-foreground">
+                        Also sync firm profile badge & active promo to {bulkDiscountPct}% OFF
+                      </span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 2: COUPON CODE & AFFILIATE LINK */}
+              <div className="p-5 rounded-2xl bg-white dark:bg-card border border-zinc-200 dark:border-border space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-foreground" />
+                    <h3 className="text-sm font-bold text-foreground">
+                      Coupon Code & Affiliate Buy Links
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-foreground">Coupon Code</label>
+                      <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          checked={bulkEnableCoupon}
+                          onChange={(e) => setBulkEnableCoupon(e.target.checked)}
+                          className="rounded border-zinc-300 text-black dark:text-white"
+                        />
+                        <span>Update Code</span>
+                      </label>
+                    </div>
+                    <input
+                      type="text"
+                      disabled={!bulkEnableCoupon}
+                      value={bulkCouponCode}
+                      onChange={(e) => setBulkCouponCode(e.target.value.toUpperCase())}
+                      placeholder="e.g. EMPIRIAL"
+                      className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-xs font-mono font-extrabold text-foreground focus:outline-none focus:border-foreground disabled:opacity-40"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-foreground">Affiliate / Buy URL</label>
+                      <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          checked={bulkEnableBuyUrl}
+                          onChange={(e) => setBulkEnableBuyUrl(e.target.checked)}
+                          className="rounded border-zinc-300 text-black dark:text-white"
+                        />
+                        <span>Update URL</span>
+                      </label>
+                    </div>
+                    <input
+                      type="text"
+                      disabled={!bulkEnableBuyUrl}
+                      value={bulkBuyUrl}
+                      onChange={(e) => setBulkBuyUrl(e.target.value)}
+                      placeholder="e.g. https://www.orionfunded.com?coupon=EMPIRIAL"
+                      className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-foreground focus:outline-none focus:border-foreground disabled:opacity-40"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 3: OTHER OPTIONAL SPEC OVERRIDES */}
+              <div className="p-5 rounded-2xl bg-white dark:bg-card border border-zinc-200 dark:border-border space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-foreground" />
+                    <h3 className="text-sm font-bold text-foreground">
+                      Challenge Specs & Badges (Optional Overrides)
+                    </h3>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground">Leave untoggled to keep existing specs</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-foreground">Profit Split %</span>
+                      <input
+                        type="checkbox"
+                        checked={bulkEnableProfitSplit}
+                        onChange={(e) => setBulkEnableProfitSplit(e.target.checked)}
+                        className="rounded"
+                      />
+                    </div>
+                    <input
+                      type="number"
+                      disabled={!bulkEnableProfitSplit}
+                      value={bulkProfitSplit}
+                      onChange={(e) => setBulkProfitSplit(Number(e.target.value))}
+                      placeholder="80"
+                      className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-1.5 text-xs font-mono font-bold text-foreground focus:outline-none disabled:opacity-40"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-foreground">Payout Frequency</span>
+                      <input
+                        type="checkbox"
+                        checked={bulkEnablePayoutFreq}
+                        onChange={(e) => setBulkEnablePayoutFreq(e.target.checked)}
+                        className="rounded"
+                      />
+                    </div>
+                    <input
+                      type="text"
+                      disabled={!bulkEnablePayoutFreq}
+                      value={bulkPayoutFreq}
+                      onChange={(e) => setBulkPayoutFreq(e.target.value)}
+                      placeholder="Bi-Weekly / 14 Days"
+                      className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-1.5 text-xs font-bold text-foreground focus:outline-none disabled:opacity-40"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-foreground">Max Leverage</span>
+                      <input
+                        type="checkbox"
+                        checked={bulkEnableLeverage}
+                        onChange={(e) => setBulkEnableLeverage(e.target.checked)}
+                        className="rounded"
+                      />
+                    </div>
+                    <input
+                      type="text"
+                      disabled={!bulkEnableLeverage}
+                      value={bulkLeverage}
+                      onChange={(e) => setBulkLeverage(e.target.value)}
+                      placeholder="1:100"
+                      className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-1.5 text-xs font-mono font-bold text-foreground focus:outline-none disabled:opacity-40"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* LIVE IMPACT PREVIEW TABLE */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                    Live Impact Preview ({previewChallenges.length} challenges affected)
+                  </h3>
+                </div>
+                <span className="text-[11px] text-muted-foreground">
+                  Showing price recalculations before applying
+                </span>
+              </div>
+
+              <div className="border border-zinc-200 dark:border-border rounded-2xl overflow-hidden max-h-56 overflow-y-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-zinc-100 dark:bg-zinc-900 text-muted-foreground text-[10px] uppercase font-bold sticky top-0 border-b border-zinc-200 dark:border-zinc-800">
+                    <tr>
+                      <th className="py-2.5 px-3">Challenge Tier</th>
+                      <th className="py-2.5 px-3">Size</th>
+                      <th className="py-2.5 px-3">Original</th>
+                      <th className="py-2.5 px-3">Before</th>
+                      <th className="py-2.5 px-3">After ({bulkDiscountPct}% OFF)</th>
+                      <th className="py-2.5 px-3 text-right">Trader Savings</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 font-mono">
+                    {previewChallenges.map((item) => (
+                      <tr key={item.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50">
+                        <td className="py-2 px-3 font-sans font-bold text-foreground">
+                          {item.name}
+                        </td>
+                        <td className="py-2 px-3 text-muted-foreground">
+                          ${item.account_size.toLocaleString('en-US')}
+                        </td>
+                        <td className="py-2 px-3 text-muted-foreground line-through">
+                          ${item.origPrice}
+                        </td>
+                        <td className="py-2 px-3 text-zinc-500">
+                          ${item.oldPrice} ({item.oldDiscount}%)
+                        </td>
+                        <td className="py-2 px-3 font-extrabold text-foreground">
+                          <span className="bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md">
+                            ${item.newPrice}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-right font-bold text-emerald-600 dark:text-emerald-400">
+                          +${item.savings} ({bulkDiscountPct}%)
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-between pt-4 border-t border-zinc-200 dark:border-zinc-800">
+              <span className="text-xs text-muted-foreground">
+                Target: <strong>{firms.find((f) => f.id === bulkTargetFirmId)?.name || bulkTargetFirmId}</strong> • {previewChallenges.length} challenges
+              </span>
+
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsBulkEditModalOpen(false)}
+                  disabled={isBulkApplying}
+                  className="px-5 py-2.5 rounded-xl border border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-card dark:text-foreground text-xs font-semibold cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleApplyBulkFirmUpdate}
+                  disabled={isBulkApplying || previewChallenges.length === 0}
+                  className="px-6 py-2.5 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-bold cursor-pointer shadow-xs transition-all disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isBulkApplying ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white dark:border-black/30 dark:border-t-black rounded-full animate-spin" />
+                      <span>Applying to {previewChallenges.length} Challenges...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Apply Updates to {previewChallenges.length} Challenges</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

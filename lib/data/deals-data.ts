@@ -80,5 +80,21 @@ export const MOCK_DEALS: Deal[] = [
     is_verified: true,
     created_at: '2026-01-01',
     category: 'forex'
+  },
+  {
+    id: 'deal-orion-empirial',
+    firm_id: 'orion-funded',
+    firm_name: 'Orion Funded',
+    firm_slug: 'orion-funded',
+    firm_logo: '/logos/orion-funded.svg',
+    code: 'EMPIRIAL',
+    discount_pct: 50,
+    discount_label: 'Exclusive 50% OFF Orion Funded with Code EMPIRIAL',
+    description: 'Apply exclusive partner discount code EMPIRIAL at checkout for a massive 50% discount on all evaluation challenge tiers.',
+    affiliate_url: 'https://www.orionfunded.com?coupon=EMPIRIAL',
+    is_featured: true,
+    is_verified: true,
+    created_at: '2026-01-01',
+    category: 'forex'
   }
 ];

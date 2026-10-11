@@ -21,8 +21,24 @@ export function getStoredChallenges(): Challenge[] {
         // Auto-merge any newly added mock challenges (e.g. Orion Funded)
         const existingIds = new Set(parsed.map(c => c.id));
         const missingMockChallenges = MOCK_CHALLENGES.filter(c => !existingIds.has(c.id));
+        let shouldSync = false;
         if (missingMockChallenges.length > 0) {
           parsed = [...parsed, ...missingMockChallenges];
+          shouldSync = true;
+        }
+
+        // Upgrade Orion challenges if stored with previous 15% discount
+        parsed = parsed.map(c => {
+          if (c.firm_id === 'orion-funded' && (c.discount_pct === 15 || !c.discounted_price)) {
+            shouldSync = true;
+            const orig = c.original_price || c.price;
+            const half = Math.max(1, Math.round(orig * 0.5));
+            return { ...c, discount_pct: 50, price: half, discounted_price: half, coupon_code: 'EMPIRIAL' };
+          }
+          return c;
+        });
+
+        if (shouldSync) {
           saveStoredChallenges(parsed);
         }
         

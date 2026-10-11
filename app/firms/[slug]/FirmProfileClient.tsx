@@ -106,6 +106,54 @@ export function FirmProfileClient({
   const [effectiveChallenges, setEffectiveChallenges] = useState<Challenge[]>(firmChallenges);
   const [effectiveReviews, setEffectiveReviews] = useState<Review[]>(firmReviews);
 
+  // Derive active discount percentage dynamically:
+  // 1. Prioritize firm's own discount_pct (what was configured for the firm)
+  // 2. Check firm's deals
+  // 3. Check firm's challenges
+  // 4. Try parsing discount from discount_label_custom
+  const activePromoPct = useMemo(() => {
+    if (effectiveFirm.discount_pct && effectiveFirm.discount_pct > 0) {
+      return effectiveFirm.discount_pct;
+    }
+    if (firmDeals && firmDeals.length > 0 && firmDeals[0]?.discount_pct) {
+      return firmDeals[0].discount_pct;
+    }
+    const chWithDisc = effectiveChallenges.find((c) => c.discount_pct && c.discount_pct > 0);
+    if (chWithDisc?.discount_pct) {
+      return chWithDisc.discount_pct;
+    }
+    if (effectiveFirm.discount_label_custom) {
+      const match = effectiveFirm.discount_label_custom.match(/(\d+)%/);
+      if (match) return parseInt(match[1], 10);
+    }
+    return null;
+  }, [effectiveFirm.discount_pct, effectiveFirm.discount_label_custom, firmDeals, effectiveChallenges]);
+
+  const activeCouponCode = effectiveFirm.coupon_code_custom || firmDeals[0]?.code || 'EMPIRIAL';
+
+  const activeDiscountLabel = useMemo(() => {
+    if (activePromoPct) {
+      return `${activePromoPct}% OFF`;
+    }
+    if (effectiveFirm.discount_label_custom && !effectiveFirm.discount_label_custom.includes('20% OFF')) {
+      return effectiveFirm.discount_label_custom;
+    }
+    return activeCouponCode ? `CODE: ${activeCouponCode}` : 'CLAIM DISCOUNT';
+  }, [activePromoPct, effectiveFirm, activeCouponCode]);
+
+  const activePromoTitle = useMemo(() => {
+    if (effectiveFirm.discount_label_custom && !effectiveFirm.discount_label_custom.includes('20% OFF') && !effectiveFirm.discount_label_custom.includes('SPECIAL OFFER')) {
+      return effectiveFirm.discount_label_custom;
+    }
+    if (firmDeals && firmDeals.length > 0 && firmDeals[0]?.discount_label) {
+      return firmDeals[0].discount_label;
+    }
+    if (activePromoPct) {
+      return `Exclusive ${activePromoPct}% OFF with Code ${activeCouponCode}`;
+    }
+    return 'EXCLUSIVE PARTNER PROMO';
+  }, [effectiveFirm, firmDeals, activePromoPct, activeCouponCode]);
+
   useEffect(() => {
     // 1. Sync firm itself
     const storedF = getStoredFirms();
@@ -309,7 +357,7 @@ export function FirmProfileClient({
                 {/* Discount Code Button */}
                 <button
                   type="button"
-                  onClick={() => handleCopyCode(effectiveFirm.coupon_code_custom || 'EMPIRE')}
+                  onClick={() => handleCopyCode(activeCouponCode)}
                   className="px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-foreground text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-xs"
                 >
                   {copiedCode ? (
@@ -320,7 +368,7 @@ export function FirmProfileClient({
                   ) : (
                     <>
                       <Copy className="w-4 h-4" />
-                      <span>{effectiveFirm.discount_label_custom || effectiveFirm.coupon_code_custom || '20% OFF'}</span>
+                      <span>{activeDiscountLabel}</span>
                     </>
                   )}
                 </button>
@@ -622,24 +670,24 @@ export function FirmProfileClient({
                 </div>
 
                 {/* Active Promo Deal */}
-                {(firmDeals.length > 0 || effectiveFirm.coupon_code_custom) && (
+                {(firmDeals.length > 0 || effectiveFirm.coupon_code_custom || activePromoPct) && (
                   <div className="bg-white dark:bg-card border-2 border-black dark:border-white rounded-2xl p-6 space-y-3 shadow-xs">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-foreground uppercase tracking-wider">ACTIVE PROMO</span>
                       <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                        -{firmDeals[0]?.discount_pct || effectiveFirm.discount_pct || 20}% OFF
+                        {activePromoPct ? `-${activePromoPct}% OFF` : activeDiscountLabel}
                       </span>
                     </div>
                     <h3 className="text-base font-bold text-foreground">
-                      {firmDeals[0]?.discount_label || effectiveFirm.discount_label_custom || 'EXCLUSIVE DISCOUNT'}
+                      {activePromoTitle}
                     </h3>
                     <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
                       <span className="font-mono text-xs font-extrabold text-foreground">
-                        {firmDeals[0]?.code || effectiveFirm.coupon_code_custom || 'EMPIRE'}
+                        {activeCouponCode}
                       </span>
                       <button
                         type="button"
-                        onClick={() => handleCopyCode(firmDeals[0]?.code || effectiveFirm.coupon_code_custom || 'EMPIRE')}
+                        onClick={() => handleCopyCode(activeCouponCode)}
                         className="px-3 py-1.5 rounded-lg bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black text-xs font-semibold shadow-xs cursor-pointer"
                       >
                         {copiedCode ? 'Copied' : 'Copy'}
@@ -955,7 +1003,27 @@ export function FirmProfileClient({
           {/* Tab 3: Offers */}
           {activeTab === 'offers' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {firmDeals.map((deal) => (
+              {(firmDeals.length > 0
+                ? firmDeals
+                : [
+                    {
+                      id: `deal-${effectiveFirm.id}-default`,
+                      firm_id: effectiveFirm.id,
+                      firm_name: effectiveFirm.name,
+                      firm_slug: effectiveFirm.slug,
+                      firm_logo: effectiveFirm.logo_url,
+                      code: activeCouponCode,
+                      discount_pct: activePromoPct || 50,
+                      discount_label: activePromoTitle,
+                      description: `Use exclusive coupon code ${activeCouponCode} during checkout to receive ${activePromoPct || 50}% discount on ${effectiveFirm.name} evaluation accounts.`,
+                      affiliate_url: effectiveFirm.buy_url || officialSiteUrl,
+                      is_featured: true,
+                      is_verified: true,
+                      created_at: '2026-01-01',
+                      category: effectiveFirm.category || 'forex',
+                    },
+                  ]
+              ).map((deal) => (
                 <div key={deal.id} className="bg-white dark:bg-card border border-zinc-200 dark:border-border rounded-2xl p-6 space-y-4 shadow-xs">
                   <div className="flex justify-between items-center">
                     <h3 className="text-base font-extrabold text-foreground">{deal.discount_label}</h3>

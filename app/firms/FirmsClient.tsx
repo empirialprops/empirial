@@ -735,7 +735,7 @@ export function FirmsClient() {
                                 ) : (
                                   <>
                                     <Copy className="w-3 h-3" />
-                                    <span>{firm.discount_label_custom || '20% OFF'}</span>
+                                    <span>{firm.discount_pct ? `${firm.discount_pct}% OFF` : (firm.discount_label_custom || 'CLAIM')}</span>
                                   </>
                                 )}
                               </motion.button>
@@ -843,7 +843,7 @@ export function FirmsClient() {
                                     : 'border-zinc-200 bg-white text-zinc-900 dark:border-zinc-800 dark:bg-card dark:text-foreground'
                                   }`}
                               >
-                                {isCopiedNow ? 'Copied!' : hasCopied ? 'Code Copied ✓' : (firm.discount_label_custom || '20% OFF')}
+                                {isCopiedNow ? 'Copied!' : hasCopied ? 'Code Copied ✓' : (firm.discount_pct ? `${firm.discount_pct}% OFF` : (firm.discount_label_custom || 'CLAIM'))}
                               </motion.button>
 
                               <button
