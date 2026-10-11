@@ -18,6 +18,14 @@ export function getStoredChallenges(): Challenge[] {
         // Strip out unadded default firms
         parsed = parsed.filter(c => c.firm_id !== 'ftmo' && c.firm_id !== 'funding-pips' && c.id !== 'ch-ftmo-100k' && c.id !== 'ch-pips-100k');
         
+        // Auto-merge any newly added mock challenges (e.g. Orion Funded)
+        const existingIds = new Set(parsed.map(c => c.id));
+        const missingMockChallenges = MOCK_CHALLENGES.filter(c => !existingIds.has(c.id));
+        if (missingMockChallenges.length > 0) {
+          parsed = [...parsed, ...missingMockChallenges];
+          saveStoredChallenges(parsed);
+        }
+        
         return parsed;
       }
     }

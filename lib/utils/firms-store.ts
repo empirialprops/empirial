@@ -17,6 +17,14 @@ export function getStoredFirms(): Firm[] {
       if (Array.isArray(parsed) && parsed.length > 0) {
         // Strip out unadded default firms
         parsed = parsed.filter(f => f.id !== 'ftmo' && f.id !== 'funding-pips' && f.slug !== 'ftmo' && f.slug !== 'funding-pips');
+        
+        // Auto-merge any newly added mock firms (e.g. Orion Funded)
+        const existingIds = new Set(parsed.map(f => f.id));
+        const missingMockFirms = MOCK_FIRMS.filter(f => !existingIds.has(f.id));
+        if (missingMockFirms.length > 0) {
+          parsed = [...parsed, ...missingMockFirms];
+          saveStoredFirms(parsed);
+        }
         return parsed;
       }
     }

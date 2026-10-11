@@ -62,6 +62,7 @@ export interface Challenge {
   steps: number; // 1, 2, 3, or 0 (instant)
   price: number;
   original_price: number;
+  discounted_price?: number;
   profit_split_pct: number;
   daily_loss_limit_pct: number;
   max_loss_limit_pct: number;

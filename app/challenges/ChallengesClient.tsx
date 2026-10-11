@@ -596,7 +596,16 @@ export function ChallengesClient() {
                     const hasWarning = warningChallengeId === ch.id;
 
                     const codeText = ch.coupon_code || 'EMPIRE';
-                    const originalPrice = ch.original_price || Math.round(ch.price * 1.25);
+                    const effectiveDiscountedPrice =
+                      ch.discounted_price !== undefined
+                        ? ch.discounted_price
+                        : ch.discount_pct && ch.discount_pct > 0
+                        ? Math.round(ch.price * (1 - ch.discount_pct / 100))
+                        : ch.price;
+                    const originalPrice =
+                      effectiveDiscountedPrice < ch.price
+                        ? ch.price
+                        : ch.original_price || Math.round(ch.price * 1.25);
                     const targetStr = (ch.steps === 2 && ch.phase_2_target_pct && ch.phase_2_target_pct > 0)
                       ? `${ch.profit_target_pct ?? 0}% | ${ch.phase_2_target_pct}%`
                       : ch.steps === 0
@@ -735,7 +744,7 @@ export function ChallengesClient() {
                               {/* Price Display (Offered Price Upward + Cut Price Downside) */}
                               <div className="text-right shrink-0">
                                 <div className="text-sm sm:text-base font-extrabold text-foreground tracking-tight leading-tight">
-                                  ${ch.price.toLocaleString('en-US')}
+                                  ${effectiveDiscountedPrice.toLocaleString('en-US')}
                                 </div>
                                 <div className="text-[11px] line-through text-muted-foreground font-medium">
                                   ${originalPrice.toLocaleString('en-US')}
@@ -826,7 +835,7 @@ export function ChallengesClient() {
                               </div>
                               <div className="text-right">
                                 <div className="text-sm font-extrabold text-foreground tracking-tight">
-                                  ${ch.price.toLocaleString('en-US')}
+                                  ${effectiveDiscountedPrice.toLocaleString('en-US')}
                                 </div>
                                 <span className="text-[10px] text-muted-foreground line-through">
                                   ${originalPrice.toLocaleString('en-US')}
