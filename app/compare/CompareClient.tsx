@@ -70,7 +70,7 @@ const PLATFORM_DATA: Record<string, { name: string; icon: string }> = {
 
 export function CompareClient() {
   const searchParams = useSearchParams();
-  const initialFirmsParam = searchParams?.get('firms')?.split(',') || ['nys-capital', 'ck-capital'];
+  const initialFirmsParam = searchParams?.get('firms')?.split(',') || ['orion-funded'];
 
   // Comparison Mode: 'firms' (Prop Firms Rules) or 'challenges' (Challenge Accounts)
   const [compareMode, setCompareMode] = useState<'firms' | 'challenges'>('firms');
@@ -78,8 +78,8 @@ export function CompareClient() {
   // Selected Slugs / IDs (Up to 4)
   const [selectedFirmSlugs, setSelectedFirmSlugs] = useState<string[]>(initialFirmsParam);
   const [selectedChallengeIds, setSelectedChallengeIds] = useState<string[]>([
-    'ch-nys-100k',
-    'ch-ck-100k',
+    'ch-orion-2step-100k',
+    'ch-orion-nova-100k',
   ]);
 
   // Search filter inside comparator selector

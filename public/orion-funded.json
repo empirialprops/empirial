@@ -14,8 +14,8 @@
     "leverage": "1:100",
     "platforms": "MetaTrader 5 (MT5), Match-Trader",
     "category": "forex",
-    "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL",
-    "coupon_code_custom": "EMPIRIAL",
+    "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50",
+    "coupon_code_custom": "EMPIRIAL50",
     "discount_label_custom": "50% OFF",
     "total_payouts": "$6,600,000+",
     "avg_payout_time": "< 5 Hours (48H Guarantee)",
@@ -105,12 +105,12 @@
       "is_best_seller": false,
       "discount_pct": 50,
       "discounted_price": 30,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$600",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     },
     {
       "name": "$10,000 2-Step Standard",
@@ -140,12 +140,12 @@
       "is_best_seller": false,
       "discount_pct": 50,
       "discounted_price": 60,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$1,200",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     },
     {
       "name": "$25,000 2-Step Standard",
@@ -175,12 +175,12 @@
       "is_best_seller": false,
       "discount_pct": 50,
       "discounted_price": 125,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$3,000",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     },
     {
       "name": "$50,000 2-Step Standard",
@@ -210,12 +210,12 @@
       "is_best_seller": false,
       "discount_pct": 50,
       "discounted_price": 195,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$6,000",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     },
     {
       "name": "$100,000 2-Step Standard",
@@ -245,12 +245,12 @@
       "is_best_seller": true,
       "discount_pct": 50,
       "discounted_price": 375,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$12,000",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     },
     {
       "name": "$200,000 2-Step Standard",
@@ -280,12 +280,12 @@
       "is_best_seller": false,
       "discount_pct": 50,
       "discounted_price": 675,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$24,000",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     },
     {
       "name": "$5,000 3-Step Select",
@@ -315,12 +315,12 @@
       "is_best_seller": false,
       "discount_pct": 50,
       "discounted_price": 35,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$600",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     },
     {
       "name": "$10,000 3-Step Select",
@@ -350,12 +350,12 @@
       "is_best_seller": false,
       "discount_pct": 50,
       "discounted_price": 55,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$1,200",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     },
     {
       "name": "$25,000 3-Step Select",
@@ -385,12 +385,12 @@
       "is_best_seller": false,
       "discount_pct": 50,
       "discounted_price": 110,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$3,000",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     },
     {
       "name": "$50,000 3-Step Select",
@@ -420,12 +420,12 @@
       "is_best_seller": false,
       "discount_pct": 50,
       "discounted_price": 175,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$6,000",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     },
     {
       "name": "$100,000 3-Step Select",
@@ -455,12 +455,12 @@
       "is_best_seller": true,
       "discount_pct": 50,
       "discounted_price": 245,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$12,000",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     },
     {
       "name": "$200,000 3-Step Select",
@@ -490,12 +490,12 @@
       "is_best_seller": false,
       "discount_pct": 50,
       "discounted_price": 440,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$24,000",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     },
     {
       "name": "$5,000 Instant Zero",
@@ -525,12 +525,12 @@
       "is_best_seller": false,
       "discount_pct": 50,
       "discounted_price": 120,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$600",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     },
     {
       "name": "$10,000 Instant Zero",
@@ -560,12 +560,12 @@
       "is_best_seller": false,
       "discount_pct": 50,
       "discounted_price": 210,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$1,200",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     },
     {
       "name": "$25,000 Instant Zero",
@@ -595,12 +595,12 @@
       "is_best_seller": false,
       "discount_pct": 50,
       "discounted_price": 300,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$3,000",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     },
     {
       "name": "$50,000 Instant Zero",
@@ -630,12 +630,12 @@
       "is_best_seller": false,
       "discount_pct": 50,
       "discounted_price": 475,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$6,000",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     },
     {
       "name": "$100,000 Instant Zero",
@@ -665,12 +665,12 @@
       "is_best_seller": true,
       "discount_pct": 50,
       "discounted_price": 690,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$12,000",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     },
     {
       "name": "$5,000 1-Step Nova",
@@ -700,12 +700,12 @@
       "is_best_seller": false,
       "discount_pct": 50,
       "discounted_price": 35,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$600",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     },
     {
       "name": "$10,000 1-Step Nova",
@@ -735,12 +735,12 @@
       "is_best_seller": false,
       "discount_pct": 50,
       "discounted_price": 55,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$1,200",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     },
     {
       "name": "$25,000 1-Step Nova",
@@ -770,12 +770,12 @@
       "is_best_seller": false,
       "discount_pct": 50,
       "discounted_price": 105,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$3,000",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     },
     {
       "name": "$50,000 1-Step Nova",
@@ -805,12 +805,12 @@
       "is_best_seller": false,
       "discount_pct": 50,
       "discounted_price": 175,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$6,000",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     },
     {
       "name": "$100,000 1-Step Nova",
@@ -840,12 +840,12 @@
       "is_best_seller": true,
       "discount_pct": 50,
       "discounted_price": 335,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$12,000",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     },
     {
       "name": "$200,000 1-Step Nova",
@@ -875,12 +875,12 @@
       "is_best_seller": false,
       "discount_pct": 50,
       "discounted_price": 550,
-      "coupon_code": "EMPIRIAL",
+      "coupon_code": "EMPIRIAL50",
       "avg_payout": "$24,000",
       "crypto_max_leverage": "1:20",
       "crypto_max_open_positions": "",
       "crypto_total_notional_exposure": "",
-      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL"
+      "buy_url": "https://www.orionfunded.com?coupon=EMPIRIAL50"
     }
   ]
 }

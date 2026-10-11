@@ -27,6 +27,7 @@ import { MOCK_CHALLENGES } from '@/lib/data/challenges-data';
 import { MOCK_FIRMS } from '@/lib/data/firms-data';
 import { Challenge, Review } from '@/lib/types';
 import { getChallenges, getFirms, getReviews } from '@/lib/firebase/services';
+import { getStoredFirms } from '@/lib/utils/firms-store';
 import { calculateFirmMetrics } from '@/lib/utils/rating-calculator';
 
 // Map firm IDs to authentic uploaded local logo assets in /logos/
@@ -147,39 +148,44 @@ export function ChallengesClient() {
           getFirms(),
           getReviews()
         ]);
+        const MOCK_IDS_TO_REMOVE = new Set([
+          'ch-nys-100k', 'ch-ck-100k', 'ch-dolvero-100k', 'ch-alpha-100k',
+          'ch-gtf-100k', 'ch-pipstone-100k', 'ch-shark-100k', 'ch-sure-100k',
+          'ch-ftmo-100k', 'ch-pips-100k'
+        ]);
+
         if (challsData && challsData.length > 0) {
           const map = new Map<string, Challenge>();
           challsData.forEach((c) => {
-            if (c.id) map.set(c.id, c);
+            if (c.id && !MOCK_IDS_TO_REMOVE.has(c.id)) map.set(c.id, c);
           });
           MOCK_CHALLENGES.forEach((c) => {
-            if (c.id && !map.has(c.id)) map.set(c.id, c);
+            if (c.id && !MOCK_IDS_TO_REMOVE.has(c.id) && !map.has(c.id)) map.set(c.id, c);
           });
           setChallenges(Array.from(map.values()));
         } else {
-          setChallenges(MOCK_CHALLENGES);
+          setChallenges(MOCK_CHALLENGES.filter(c => !MOCK_IDS_TO_REMOVE.has(c.id)));
         }
+
         if (firmsData && firmsData.length > 0) {
           const map = new Map<string, any>();
           firmsData.forEach((f) => {
             const key = f.id || f.slug;
             if (key) map.set(key, f);
           });
-          MOCK_FIRMS.forEach((f) => {
-            const key = f.id || f.slug;
-            if (key && !map.has(key)) map.set(key, f);
-          });
           setFirms(Array.from(map.values()));
         } else {
-          setFirms(MOCK_FIRMS);
+          const stored = typeof window !== 'undefined' ? getStoredFirms() : [];
+          setFirms(stored.length > 0 ? stored : []);
         }
+
         if (revsData && revsData.length > 0) {
           setAllReviews(revsData);
         }
       } catch (err) {
         console.error('Failed to load challenges data:', err);
         setChallenges(MOCK_CHALLENGES);
-        setFirms(MOCK_FIRMS);
+        setFirms([]);
       } finally {
         setLoading(false);
       }
@@ -187,9 +193,44 @@ export function ChallengesClient() {
     loadData();
   }, []);
 
-  // Filter options
-  const firmOptions = useMemo(() => (firms.length > 0 ? firms : MOCK_FIRMS), [firms]);
-  const sizeOptions = [50000, 80000, 100000, 150000, 200000];
+  // Filter options: Only include firms that have active challenges in the directory
+  const firmOptions = useMemo(() => {
+    const challengeFirmKeys = new Set<string>();
+    challenges.forEach((c) => {
+      if (c.firm_id) challengeFirmKeys.add(c.firm_id.toLowerCase());
+      if (c.firm_slug) challengeFirmKeys.add(c.firm_slug.toLowerCase());
+    });
+
+    const matchedFirms = (firms || []).filter((f) => {
+      const idMatch = f.id && challengeFirmKeys.has(f.id.toLowerCase());
+      const slugMatch = f.slug && challengeFirmKeys.has(f.slug.toLowerCase());
+      return idMatch || slugMatch;
+    });
+
+    if (matchedFirms.length > 0) return matchedFirms;
+
+    // Fallback: extract distinct firms directly from active challenges
+    const synthesized = new Map<string, any>();
+    challenges.forEach((c) => {
+      const key = c.firm_id || c.firm_slug || c.firm_name;
+      if (key && !synthesized.has(key)) {
+        synthesized.set(key, {
+          id: c.firm_id,
+          name: c.firm_name,
+          slug: c.firm_slug,
+          logo_url: c.firm_logo,
+        });
+      }
+    });
+    return Array.from(synthesized.values());
+  }, [challenges, firms]);
+
+  // Dynamic account size options derived from active challenges
+  const sizeOptions = useMemo(() => {
+    const sizes = Array.from(new Set(challenges.map((c) => c.account_size).filter(Boolean))).sort((a, b) => a - b);
+    return sizes.length > 0 ? sizes : [5000, 10000, 25000, 50000, 100000, 200000];
+  }, [challenges]);
+
   const stepOptions = [
     { label: '1-Step', val: 1 },
     { label: '2-Step', val: 2 },

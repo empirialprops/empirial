@@ -40,13 +40,13 @@ import {
   deleteChallengesBatch,
   updateFirm,
 } from '@/lib/firebase/services';
-import { saveStoredChallenges } from '@/lib/utils/challenges-store';
+import { getStoredChallenges, saveStoredChallenges } from '@/lib/utils/challenges-store';
 import { updateStoredFirm } from '@/lib/utils/firms-store';
 import { logAdminAction } from '@/lib/utils/audit-log-store';
 import BatchChallengePortal from '@/components/admin/BatchChallengePortal';
 
 export default function AdminChallengesPage() {
-  const [activeTab, setActiveTab] = useState<'batch' | 'directory'>('batch');
+  const [activeTab, setActiveTab] = useState<'batch' | 'directory'>('directory');
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [firms, setFirms] = useState<Firm[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +68,7 @@ export default function AdminChallengesPage() {
   const [bulkAutoRecalculatePrices, setBulkAutoRecalculatePrices] = useState(true);
   const [bulkApplyToPrice, setBulkApplyToPrice] = useState(true);
   const [bulkEnableCoupon, setBulkEnableCoupon] = useState(true);
-  const [bulkCouponCode, setBulkCouponCode] = useState<string>('EMPIRIAL');
+  const [bulkCouponCode, setBulkCouponCode] = useState<string>('EMPIRIAL50');
   const [bulkEnableBuyUrl, setBulkEnableBuyUrl] = useState(false);
   const [bulkBuyUrl, setBulkBuyUrl] = useState<string>('');
   const [bulkEnableProfitSplit, setBulkEnableProfitSplit] = useState(false);
@@ -89,39 +89,39 @@ export default function AdminChallengesPage() {
 
   // Single Form State
   const [formData, setFormData] = useState<Partial<Challenge>>({
-    firm_id: '',
-    firm_name: '',
-    firm_slug: '',
-    firm_logo: '/logos/nys.png',
-    name: '$100K 2-Step Evaluation',
-    account_size: 100000,
+    firm_id: 'orion-funded',
+    firm_name: 'Orion Funded',
+    firm_slug: 'orion-funded',
+    firm_logo: '/logos/orion-funded.svg',
+    name: '$5,000 2-Step Standard',
+    account_size: 5000,
     steps: 2,
-    price: 499,
-    original_price: 599,
-    profit_split_pct: 85,
-    daily_loss_limit_pct: 5,
-    max_loss_limit_pct: 10,
-    profit_target_pct: 8,
-    phase_2_target_pct: 5,
-    min_trading_days: 0,
+    price: 30,
+    original_price: 59,
+    profit_split_pct: 80,
+    daily_loss_limit_pct: 3,
+    max_loss_limit_pct: 6,
+    profit_target_pct: 6,
+    phase_2_target_pct: 6,
+    min_trading_days: 4,
     max_trading_days: 'Unlimited',
     payout_frequency: 'Bi-Weekly / 14 Days',
     leverage: '1:100',
     refundable_fee: true,
-    buy_url: 'https://discord.gg/ww4dkeeZdp',
-    coupon_code: 'EMPIRE',
-    discount_pct: 20,
+    buy_url: 'https://www.orionfunded.com?coupon=EMPIRIAL50',
+    coupon_code: 'EMPIRIAL50',
+    discount_pct: 50,
     is_featured: true,
     is_best_seller: false,
     category: 'forex',
-    rating: 4.9,
-    review_count: 1200,
-    consistency_rule: 'No Consistency Rule',
-    max_risk_per_trade: '2% / Trade',
+    rating: 4.5,
+    review_count: 2100,
+    consistency_rule: 'No Best Day Rule',
+    max_risk_per_trade: 'No Limit',
     inactivity_period: '30 Days',
-    crypto_max_leverage: '1:5',
-    crypto_max_open_positions: '5 Positions',
-    crypto_total_notional_exposure: '$250,000',
+    crypto_max_leverage: '1:20',
+    crypto_max_open_positions: '',
+    crypto_total_notional_exposure: '',
     news_trading: 'YES / Allowed',
     overnight_weekend: 'YES | YES',
     loss_type: 'Static',
@@ -132,16 +132,27 @@ export default function AdminChallengesPage() {
     async function loadData() {
       try {
         const [challsData, firmsData] = await Promise.all([getChallenges(), getFirms()]);
-        setChallenges(challsData.length > 0 ? challsData : MOCK_CHALLENGES);
+        const challMap = new Map<string, Challenge>();
+        MOCK_CHALLENGES.forEach((c: Challenge) => { if (c.id) challMap.set(c.id, c); });
+        const localChalls: Challenge[] = typeof window !== 'undefined' ? getStoredChallenges() : [];
+        localChalls.forEach((c: Challenge) => { if (c.id) challMap.set(c.id, c); });
+        (challsData || []).forEach((c: Challenge) => { if (c.id) challMap.set(c.id, c); });
+        const resolvedChallenges = Array.from(challMap.values());
+        setChallenges(resolvedChallenges);
+
         const resolvedFirms = firmsData.length > 0 ? firmsData : MOCK_FIRMS;
         setFirms(resolvedFirms);
         if (resolvedFirms.length > 0) {
+          const defaultF = resolvedFirms.find((f) => f.id === 'orion-funded') || resolvedFirms[0];
           setFormData((prev) => ({
             ...prev,
-            firm_id: resolvedFirms[0].id,
-            firm_name: resolvedFirms[0].name,
-            firm_slug: resolvedFirms[0].slug,
-            firm_logo: resolvedFirms[0].logo_url,
+            firm_id: defaultF.id,
+            firm_name: defaultF.name,
+            firm_slug: defaultF.slug,
+            firm_logo: defaultF.logo_url,
+            coupon_code: defaultF.coupon_code_custom || 'EMPIRIAL50',
+            discount_pct: defaultF.discount_pct || 50,
+            buy_url: defaultF.buy_url || 'https://www.orionfunded.com?coupon=EMPIRIAL50',
           }));
         }
       } catch (err) {
@@ -164,39 +175,40 @@ export default function AdminChallengesPage() {
         firm_name: matched.name,
         firm_slug: matched.slug,
         firm_logo: matched.logo_url,
-        rating: matched.rating || prev.rating || 4.9,
-        review_count: matched.review_count || prev.review_count || 1200,
+        rating: matched.rating || prev.rating || 4.5,
+        review_count: matched.review_count || prev.review_count || 2100,
         buy_url: matched.buy_url || prev.buy_url,
-        coupon_code: matched.coupon_code_custom || prev.coupon_code || 'EMPIRE',
+        coupon_code: matched.coupon_code_custom || prev.coupon_code || 'EMPIRIAL50',
+        discount_pct: matched.discount_pct || prev.discount_pct || 50,
       }));
     }
   };
 
   const handleStartAdd = () => {
-    const defaultFirm = firms[0] || {
-      id: 'nys',
-      name: 'NYS Capital',
-      slug: 'nys-capital',
-      logo_url: '/logos/nys.png',
-      rating: 4.9,
-      review_count: 1200,
+    const defaultFirm = firms.find((f) => f.id === 'orion-funded') || firms[0] || {
+      id: 'orion-funded',
+      name: 'Orion Funded',
+      slug: 'orion-funded',
+      logo_url: '/logos/orion-funded.svg',
+      rating: 4.5,
+      review_count: 2100,
     };
     setFormData({
       firm_id: defaultFirm.id,
       firm_name: defaultFirm.name,
       firm_slug: defaultFirm.slug,
       firm_logo: defaultFirm.logo_url,
-      name: '$100K 2-Step Stellar',
-      account_size: 100000,
+      name: '$5,000 2-Step Standard',
+      account_size: 5000,
       steps: 2,
-      price: 479,
-      original_price: 599,
-      profit_split_pct: 85,
-      daily_loss_limit_pct: 5,
-      max_loss_limit_pct: 10,
-      profit_target_pct: 8,
-      phase_2_target_pct: 5,
-      min_trading_days: 0,
+      price: 30,
+      original_price: 59,
+      profit_split_pct: 80,
+      daily_loss_limit_pct: 3,
+      max_loss_limit_pct: 6,
+      profit_target_pct: 6,
+      phase_2_target_pct: 6,
+      min_trading_days: 4,
       max_trading_days: 'Unlimited',
       payout_frequency: 'Bi-Weekly / 14 Days',
       avg_payout: '$5,400',
@@ -331,13 +343,19 @@ export default function AdminChallengesPage() {
 
     const initialCoupon =
       resolvedFirmId === 'orion-funded'
-        ? 'EMPIRIAL'
+        ? (initialDiscount === 50 ? 'EMPIRIAL50' : 'EMPIRIAL')
         : targetFirm?.coupon_code_custom || 'EMPIRE';
     setBulkCouponCode(initialCoupon);
     setBulkEnableCoupon(true);
 
-    setBulkBuyUrl(targetFirm?.buy_url || '');
-    setBulkEnableBuyUrl(false);
+    const initialBuyUrl =
+      resolvedFirmId === 'orion-funded'
+        ? (initialDiscount === 50
+            ? 'https://www.orionfunded.com?coupon=EMPIRIAL50'
+            : 'https://www.orionfunded.com?coupon=EMPIRIAL')
+        : targetFirm?.buy_url || '';
+    setBulkBuyUrl(initialBuyUrl);
+    setBulkEnableBuyUrl(resolvedFirmId === 'orion-funded');
 
     setBulkProfitSplit(80);
     setBulkEnableProfitSplit(false);
@@ -1813,18 +1831,29 @@ export default function AdminChallengesPage() {
                         />
                         <div className="flex flex-wrap items-center gap-1.5 flex-1">
                           {[
-                            { label: '15%', val: 15 },
+                            { label: '15% (EMPIRIAL)', val: 15 },
                             { label: '20%', val: 20 },
                             { label: '25%', val: 25 },
                             { label: '30%', val: 30 },
                             { label: '40%', val: 40 },
-                            { label: '50% (EMPIRIAL)', val: 50 },
+                            { label: '50% (EMPIRIAL50)', val: 50 },
                             { label: '60%', val: 60 },
                           ].map((preset) => (
                             <button
                               key={preset.label}
                               type="button"
-                              onClick={() => setBulkDiscountPct(preset.val)}
+                              onClick={() => {
+                                setBulkDiscountPct(preset.val);
+                                if (bulkTargetFirmId === 'orion-funded') {
+                                  if (preset.val === 50) {
+                                    setBulkCouponCode('EMPIRIAL50');
+                                    setBulkBuyUrl('https://www.orionfunded.com?coupon=EMPIRIAL50');
+                                  } else if (preset.val === 15) {
+                                    setBulkCouponCode('EMPIRIAL');
+                                    setBulkBuyUrl('https://www.orionfunded.com?coupon=EMPIRIAL');
+                                  }
+                                }
+                              }}
                               className={`px-2.5 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
                                 bulkDiscountPct === preset.val
                                   ? 'bg-black text-white dark:bg-white dark:text-black font-extrabold shadow-2xs'
@@ -1868,7 +1897,7 @@ export default function AdminChallengesPage() {
                             Apply Directly to Display Price
                           </span>
                           <span className="text-[11px] text-muted-foreground block">
-                            Updates the main listing price so directory cards immediately showcase the 50% discount price.
+                            Updates the main listing price so directory cards immediately showcase the {bulkDiscountPct}% discount price.
                           </span>
                         </div>
                       </label>
@@ -1898,6 +1927,36 @@ export default function AdminChallengesPage() {
                       Coupon Code & Affiliate Buy Links
                     </h3>
                   </div>
+                  {bulkTargetFirmId === 'orion-funded' && (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBulkDiscountPct(50);
+                          setBulkCouponCode('EMPIRIAL50');
+                          setBulkBuyUrl('https://www.orionfunded.com?coupon=EMPIRIAL50');
+                          setBulkEnableCoupon(true);
+                          setBulkEnableBuyUrl(true);
+                        }}
+                        className="px-2 py-1 rounded-md text-[11px] font-bold bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 text-foreground transition-colors cursor-pointer"
+                      >
+                        50% OFF (EMPIRIAL50)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBulkDiscountPct(15);
+                          setBulkCouponCode('EMPIRIAL');
+                          setBulkBuyUrl('https://www.orionfunded.com?coupon=EMPIRIAL');
+                          setBulkEnableCoupon(true);
+                          setBulkEnableBuyUrl(true);
+                        }}
+                        className="px-2 py-1 rounded-md text-[11px] font-bold bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 text-foreground transition-colors cursor-pointer"
+                      >
+                        15% OFF (EMPIRIAL)
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

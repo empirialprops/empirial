@@ -51,6 +51,7 @@ import { MOCK_EVENTS } from '../data/events-data';
 import { MOCK_DEALS } from '../data/deals-data';
 import { MOCK_REVIEWS } from '../data/reviews-data';
 import { MOCK_FIRMS } from '../data/firms-data';
+import { MOCK_CHALLENGES } from '../data/challenges-data';
 import { 
   getStoredFirms, 
   saveStoredFirms, 
@@ -297,40 +298,43 @@ export async function deleteFirm(id: string): Promise<void> {
 // EVALUATION CHALLENGES
 // ==========================================
 export async function getChallenges(): Promise<Challenge[]> {
-  const localChallenges = typeof window !== 'undefined' ? getStoredChallenges() : [];
-  if (!db) return localChallenges;
+  const localChallenges = typeof window !== 'undefined' ? getStoredChallenges() : MOCK_CHALLENGES;
+  if (!db) return localChallenges.length > 0 ? localChallenges : MOCK_CHALLENGES;
   try {
     const colRef = collection(db, 'challenges');
     const snap = await getDocs(colRef);
     const firestoreChallenges = mapSnapshot<Challenge>(snap);
+
+    const challengeMap = new Map<string, Challenge>();
+    // 1. Base with MOCK_CHALLENGES (genuine seed challenges like Orion)
+    MOCK_CHALLENGES.forEach((c: Challenge) => {
+      if (c.id) challengeMap.set(c.id, c);
+    });
+    // 2. Overlay local stored challenges
+    localChallenges.forEach((c: Challenge) => {
+      if (c.id) challengeMap.set(c.id, c);
+    });
+    // 3. Overlay firestore challenges (cloud saved state)
     if (firestoreChallenges && firestoreChallenges.length > 0) {
-      const sorted = firestoreChallenges.sort((a, b) => (a.price || 0) - (b.price || 0));
-      if (typeof window !== 'undefined') {
-        saveStoredChallenges(sorted);
-      }
-      return sorted;
+      firestoreChallenges.forEach((c: Challenge) => {
+        if (c.id) challengeMap.set(c.id, c);
+      });
     }
-    return localChallenges.length > 0 ? localChallenges : [];
+
+    const merged = Array.from(challengeMap.values()).sort((a, b) => (a.price || 0) - (b.price || 0));
+    if (typeof window !== 'undefined' && merged.length > 0) {
+      saveStoredChallenges(merged);
+    }
+    return merged.length > 0 ? merged : MOCK_CHALLENGES;
   } catch (err) {
     console.error('Failed to fetch challenges from Firestore:', err);
-    return localChallenges.length > 0 ? localChallenges : [];
+    return localChallenges.length > 0 ? localChallenges : MOCK_CHALLENGES;
   }
 }
 
 export async function getChallengesByFirm(firmId: string): Promise<Challenge[]> {
-  if (!db) {
-    const localChallenges = typeof window !== 'undefined' ? getStoredChallenges() : [];
-    return localChallenges.filter((c) => c.firm_id === firmId);
-  }
-  try {
-    const colRef = collection(db, 'challenges');
-    const snap = await getDocs(query(colRef, where('firm_id', '==', firmId)));
-    return mapSnapshot<Challenge>(snap);
-  } catch (err) {
-    console.error('Failed to fetch challenges by firm from Firestore:', err);
-    const localChallenges = typeof window !== 'undefined' ? getStoredChallenges() : [];
-    return localChallenges.filter((c) => c.firm_id === firmId);
-  }
+  const all = await getChallenges();
+  return all.filter((c) => c.firm_id === firmId || c.firm_slug === firmId);
 }
 
 export async function getDealsByFirm(firmId: string): Promise<Deal[]> {

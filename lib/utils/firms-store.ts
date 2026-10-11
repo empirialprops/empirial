@@ -27,11 +27,19 @@ export function getStoredFirms(): Firm[] {
           shouldSyncFirms = true;
         }
 
-        // Upgrade Orion firm if stored with previous 15% discount
+        // Upgrade Orion firm if stored with previous coupon code or discount
         parsed = parsed.map(f => {
-          if (f.id === 'orion-funded' && (f.discount_pct === 15 || f.discount_label_custom === 'SPECIAL OFFER')) {
-            shouldSyncFirms = true;
-            return { ...f, discount_pct: 50, discount_label_custom: '50% OFF', coupon_code_custom: 'EMPIRIAL' };
+          if (f.id === 'orion-funded') {
+            if (f.discount_pct === 50 && (f.coupon_code_custom !== 'EMPIRIAL50' || !f.buy_url?.includes('EMPIRIAL50'))) {
+              shouldSyncFirms = true;
+              return {
+                ...f,
+                discount_pct: 50,
+                discount_label_custom: '50% OFF',
+                coupon_code_custom: 'EMPIRIAL50',
+                buy_url: 'https://www.orionfunded.com?coupon=EMPIRIAL50'
+              };
+            }
           }
           return f;
         });

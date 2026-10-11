@@ -27,10 +27,10 @@ export interface PartnerLogo {
 }
 
 export const PARTNER_LOGOS: PartnerLogo[] = [
+  { name: 'Orion Funded', logo: '/logos/orion-funded.svg', badge: 'Dubai HQ' },
   { name: 'NYS Capital', logo: '/logos/nys.png', badge: 'Dubai HQ' },
   { name: 'CK Capital', logo: '/logos/ck-capital.avif', badge: 'London HQ' },
-  { name: 'Dolvero', logo: '/logos/dolvero.png', badge: 'Dubai HQ' },
-  { name: 'Shark Funded', logo: '/logos/shark.png', badge: 'St. Vincent HQ' }
+  { name: 'Dolvero', logo: '/logos/dolvero.svg', badge: 'London HQ' },
 ];
 
 export interface Testimonial {
