@@ -62,6 +62,7 @@ export interface FirmImportPayload {
     buy_url?: string;
     coupon_code_custom?: string;
     discount_label_custom?: string;
+    discount_pct?: number;
     total_payouts?: string;
     avg_payout_time?: string;
     trust_score?: number;
@@ -126,8 +127,9 @@ export function generateFirmJsonTemplate(firm?: Firm, existingChallenges: Challe
       platforms: firm?.platforms || 'MT5, cTrader, DXtrade',
       category: firm?.category || 'forex',
       buy_url: firm?.buy_url || 'https://dolvero.com?ref=empirial',
-      coupon_code_custom: firm?.coupon_code_custom || 'DOLVERO20',
-      discount_label_custom: firm?.discount_label_custom || '20% OFF',
+      coupon_code_custom: firm?.coupon_code_custom || 'EMPIRE',
+      discount_label_custom: firm?.discount_label_custom || (firm?.discount_pct ? `${firm.discount_pct}% OFF` : ''),
+      discount_pct: firm?.discount_pct !== undefined ? firm.discount_pct : (firm?.discount_label_custom ? parseInt(firm.discount_label_custom.match(/(\d+)%/)?.[1] || '0', 10) || undefined : undefined),
       total_payouts: firm?.total_payouts || '$10,000,000+',
       avg_payout_time: firm?.avg_payout_time || '6-18 Hours',
       trust_score: firm?.trust_score || 96,
@@ -641,6 +643,12 @@ export async function commitFirmImport(
   const fallback = payload.fallback_placeholder || 'NO INFO';
 
   // 1. Prepare Firm Updates
+  const parsedDiscPct = payload.overview.discount_pct !== undefined
+    ? Number(payload.overview.discount_pct)
+    : (payload.overview.discount_label_custom
+      ? parseInt(payload.overview.discount_label_custom.match(/(\d+)%/)?.[1] || '', 10) || undefined
+      : targetFirm.discount_pct);
+
   const firmUpdates: Partial<Firm> = {
     headquarters: payload.overview.headquarters || targetFirm.headquarters || fallback,
     founded_year: payload.overview.founded_year || targetFirm.founded_year,
@@ -655,7 +663,8 @@ export async function commitFirmImport(
     category: (payload.overview.category as any) || targetFirm.category,
     buy_url: payload.overview.buy_url || targetFirm.buy_url,
     coupon_code_custom: payload.overview.coupon_code_custom || targetFirm.coupon_code_custom,
-    discount_label_custom: payload.overview.discount_label_custom || targetFirm.discount_label_custom,
+    discount_label_custom: payload.overview.discount_label_custom || (parsedDiscPct ? `${parsedDiscPct}% OFF` : targetFirm.discount_label_custom),
+    discount_pct: parsedDiscPct !== undefined ? parsedDiscPct : targetFirm.discount_pct,
     total_payouts: payload.overview.total_payouts || targetFirm.total_payouts || fallback,
     avg_payout_time: payload.overview.avg_payout_time || targetFirm.avg_payout_time || fallback,
     trust_score: payload.overview.trust_score || targetFirm.trust_score,

@@ -112,5 +112,21 @@ export const MOCK_DEALS: Deal[] = [
     is_verified: true,
     created_at: '2026-01-01',
     category: 'forex'
+  },
+  {
+    id: 'deal-klein-empirial',
+    firm_id: 'klein-funding',
+    firm_name: 'Klein Funding',
+    firm_slug: 'klein-funding',
+    firm_logo: '/logos/klein-funding.jpg',
+    code: 'EMPIRIAL',
+    discount_pct: 20,
+    discount_label: 'Exclusive 20% OFF Klein Funding with Code EMPIRIAL',
+    description: 'Apply exclusive partner coupon EMPIRIAL at checkout for 20% off all Bybit, Cleo, and Instant Pro accounts.',
+    affiliate_url: 'https://kleinfunding.com/?ref=empirial',
+    is_featured: true,
+    is_verified: true,
+    created_at: '2026-01-01',
+    category: 'crypto'
   }
 ];

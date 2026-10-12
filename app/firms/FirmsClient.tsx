@@ -25,8 +25,11 @@ import {
 } from 'lucide-react';
 import { MOCK_FIRMS } from '@/lib/data/firms-data';
 import { MOCK_REVIEWS } from '@/lib/data/reviews-data';
-import { Firm, Review } from '@/lib/types';
-import { getFirms, getReviews } from '@/lib/firebase/services';
+import { Firm, Review, Challenge, Deal } from '@/lib/types';
+import { getFirms, getReviews, getChallenges, getDeals } from '@/lib/firebase/services';
+import { getStoredFirms } from '@/lib/utils/firms-store';
+import { getStoredChallenges } from '@/lib/utils/challenges-store';
+import { getStoredDeals } from '@/lib/utils/deals-store';
 import { calculateFirmMetrics } from '@/lib/utils/rating-calculator';
 import {
   Tooltip,
@@ -52,9 +55,59 @@ const PLATFORM_DATA: Record<string, { name: string; logo: string; type: 'forex' 
 
 type SortMode = 'all' | 'popular' | 'best-value';
 
+// Helper to derive active discount percentage and label dynamically from firm, deals, challenges, and custom fields
+function resolveFirmDiscount(
+  firm: Firm,
+  allChallenges: Challenge[] = [],
+  allDeals: Deal[] = []
+): { discountPct: number | null; discountLabel: string; couponCode: string } {
+  const firmDeals = allDeals.filter((d) => d.firm_id === firm.id || d.firm_slug === firm.slug);
+  const firmChallenges = allChallenges.filter((c) => c.firm_id === firm.id || c.firm_slug === firm.slug);
+  const couponCode = firm.coupon_code_custom || firmDeals[0]?.code || firmChallenges[0]?.coupon_code || 'EMPIRE';
+
+  // 1. Explicit firm discount_pct (from admin input or firm config)
+  if (firm.discount_pct !== undefined && firm.discount_pct !== null && firm.discount_pct > 0) {
+    const label = firm.discount_label_custom && !firm.discount_label_custom.includes('20% OFF')
+      ? firm.discount_label_custom
+      : `${firm.discount_pct}% OFF`;
+    return { discountPct: firm.discount_pct, discountLabel: label, couponCode };
+  }
+
+  // 2. Matching Deal discount
+  if (firmDeals.length > 0 && firmDeals[0]?.discount_pct && firmDeals[0].discount_pct > 0) {
+    const pct = firmDeals[0].discount_pct;
+    return { discountPct: pct, discountLabel: `${pct}% OFF`, couponCode };
+  }
+
+  // 3. Matching Challenge discount
+  const chWithDisc = firmChallenges.find((c) => c.discount_pct && c.discount_pct > 0);
+  if (chWithDisc?.discount_pct) {
+    return { discountPct: chWithDisc.discount_pct, discountLabel: `${chWithDisc.discount_pct}% OFF`, couponCode };
+  }
+
+  // 4. Parse from discount_label_custom if present
+  if (firm.discount_label_custom) {
+    const match = firm.discount_label_custom.match(/(\d+)%/);
+    if (match) {
+      const pct = parseInt(match[1], 10);
+      return { discountPct: pct, discountLabel: firm.discount_label_custom, couponCode };
+    }
+    return { discountPct: null, discountLabel: firm.discount_label_custom, couponCode };
+  }
+
+  // 5. No discount input (0% or missing)
+  return {
+    discountPct: null,
+    discountLabel: couponCode ? `CODE: ${couponCode}` : 'CLAIM',
+    couponCode,
+  };
+}
+
 export function FirmsClient() {
   const [firms, setFirms] = useState<Firm[]>([]);
   const [allReviews, setAllReviews] = useState<Review[]>([]);
+  const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -94,25 +147,39 @@ export function FirmsClient() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [firmsData, reviewsData] = await Promise.all([
+        const [firmsData, reviewsData, challsData, dealsData] = await Promise.all([
           getFirms(),
-          getReviews()
+          getReviews(),
+          getChallenges(),
+          getDeals(),
         ]);
         if (firmsData && firmsData.length > 0) {
-          const uniqueFirms = Array.from(new Map(firmsData.map(f => [f.id || f.slug, f])).values());
+          const uniqueFirms = Array.from(new Map(firmsData.map((f) => [f.id || f.slug, f])).values());
           setFirms(uniqueFirms);
         } else {
-          setFirms(MOCK_FIRMS);
+          setFirms(getStoredFirms());
         }
         if (reviewsData && reviewsData.length > 0) {
           setAllReviews(reviewsData);
         } else {
           setAllReviews(MOCK_REVIEWS);
         }
+        if (challsData && challsData.length > 0) {
+          setChallenges(challsData);
+        } else {
+          setChallenges(getStoredChallenges());
+        }
+        if (dealsData && dealsData.length > 0) {
+          setDeals(dealsData);
+        } else {
+          setDeals(getStoredDeals());
+        }
       } catch (err) {
         console.error('Failed to fetch data from Firestore:', err);
-        setFirms(MOCK_FIRMS);
+        setFirms(getStoredFirms());
         setAllReviews(MOCK_REVIEWS);
+        setChallenges(getStoredChallenges());
+        setDeals(getStoredDeals());
       } finally {
         setLoading(false);
       }
@@ -120,13 +187,48 @@ export function FirmsClient() {
     loadData();
   }, []);
 
-  // Compute live review aggregates for each firm (Sync ranks and reviews with DB)
+  // Listen for real-time firm, challenge, and deal updates from admin edits
+  useEffect(() => {
+    const handleFirmsChanged = (e: any) => {
+      const list = e.detail || getStoredFirms();
+      if (list && list.length > 0) {
+        const unique = Array.from(new Map(list.map((f: Firm) => [f.id || f.slug, f])).values()) as Firm[];
+        setFirms(unique);
+      }
+    };
+    const handleChallengesChanged = (e: any) => {
+      const list = e.detail || getStoredChallenges();
+      if (list) setChallenges(list);
+    };
+    const handleDealsChanged = (e: any) => {
+      const list = e.detail || getStoredDeals();
+      if (list) setDeals(list);
+    };
+
+    window.addEventListener('empirial_firms_changed', handleFirmsChanged);
+    window.addEventListener('empirial_challenges_changed', handleChallengesChanged);
+    window.addEventListener('empirial_deals_changed', handleDealsChanged);
+
+    return () => {
+      window.removeEventListener('empirial_firms_changed', handleFirmsChanged);
+      window.removeEventListener('empirial_challenges_changed', handleChallengesChanged);
+      window.removeEventListener('empirial_deals_changed', handleDealsChanged);
+    };
+  }, []);
+
+  // Compute live review aggregates and real discounts for each firm
   const syncedFirms = useMemo(() => {
     return firms.map((firm) => {
       const metrics = calculateFirmMetrics(firm, allReviews);
-      return metrics.firm;
+      const discountInfo = resolveFirmDiscount(metrics.firm, challenges, deals);
+      return {
+        ...metrics.firm,
+        discount_pct: discountInfo.discountPct ?? metrics.firm.discount_pct,
+        discount_label_custom: discountInfo.discountLabel,
+        coupon_code_custom: discountInfo.couponCode,
+      };
     });
-  }, [firms, allReviews]);
+  }, [firms, allReviews, challenges, deals]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -735,7 +837,7 @@ export function FirmsClient() {
                                 ) : (
                                   <>
                                     <Copy className="w-3 h-3" />
-                                    <span>{firm.discount_pct ? `${firm.discount_pct}% OFF` : (firm.discount_label_custom || 'CLAIM')}</span>
+                                    <span>{firm.discount_label_custom || (firm.discount_pct ? `${firm.discount_pct}% OFF` : 'CLAIM')}</span>
                                   </>
                                 )}
                               </motion.button>
@@ -843,7 +945,7 @@ export function FirmsClient() {
                                     : 'border-zinc-200 bg-white text-zinc-900 dark:border-zinc-800 dark:bg-card dark:text-foreground'
                                   }`}
                               >
-                                {isCopiedNow ? 'Copied!' : hasCopied ? 'Code Copied ✓' : (firm.discount_pct ? `${firm.discount_pct}% OFF` : (firm.discount_label_custom || 'CLAIM'))}
+                                {isCopiedNow ? 'Copied!' : hasCopied ? 'Code Copied ✓' : (firm.discount_label_custom || (firm.discount_pct ? `${firm.discount_pct}% OFF` : 'CLAIM'))}
                               </motion.button>
 
                               <button

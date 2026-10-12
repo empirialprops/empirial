@@ -26,7 +26,7 @@ import {
   Download
 } from 'lucide-react';
 import { Firm, Challenge } from '@/lib/types';
-import { createChallengesBatch } from '@/lib/firebase/services';
+import { createChallengesBatch, updateFirm } from '@/lib/firebase/services';
 import { logAdminAction } from '@/lib/utils/audit-log-store';
 
 export interface BatchChallengeTier {
@@ -213,8 +213,13 @@ export default function BatchChallengePortal({
       if (currentFirm.coupon_code_custom) {
         setCouponCode(currentFirm.coupon_code_custom);
       }
-      if (currentFirm.discount_pct && currentFirm.discount_pct > 0) {
+      if (currentFirm.discount_pct !== undefined && currentFirm.discount_pct !== null && currentFirm.discount_pct > 0) {
         setGlobalDiscountPct(currentFirm.discount_pct);
+      } else if (currentFirm.discount_label_custom) {
+        const match = currentFirm.discount_label_custom.match(/(\d+)%/);
+        if (match) {
+          setGlobalDiscountPct(parseInt(match[1], 10));
+        }
       }
     }
   }, [currentFirm]);
@@ -493,6 +498,19 @@ export default function BatchChallengePortal({
 
       // Save all in 1 single batch call
       const createdChallenges = await createChallengesBatch(challengesPayload);
+
+      // Cascade real discount and coupon update to the firm profile
+      if (currentFirm && globalDiscountPct > 0) {
+        try {
+          await updateFirm(currentFirm.id, {
+            discount_pct: globalDiscountPct,
+            discount_label_custom: `${globalDiscountPct}% OFF`,
+            coupon_code_custom: (couponCode || currentFirm.coupon_code_custom || 'EMPIRE').toUpperCase().trim(),
+          });
+        } catch (firmErr) {
+          console.warn('Could not cascade discount update to firm:', firmErr);
+        }
+      }
 
       // Log Audit Action
       logAdminAction({

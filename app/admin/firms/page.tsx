@@ -97,9 +97,9 @@ export default function AdminFirmsPage() {
     max_allocation: '$2,000,000',
     profit_split_custom: 'Up to 90%',
     payout_custom: 'Bi-Weekly / 14 Days',
-    discount_label_custom: '20% OFF',
+    discount_label_custom: '',
     coupon_code_custom: 'EMPIRE',
-    discount_pct: 20,
+    discount_pct: undefined,
     badge_custom: 'Audited Partner',
     platforms: 'MT5, cTrader',
     platform_ids: ['mt5', 'ctrader'],
@@ -282,9 +282,9 @@ export default function AdminFirmsPage() {
       max_allocation: '$2,000,000',
       profit_split_custom: 'Up to 90%',
       payout_custom: 'Bi-Weekly / 14 Days',
-      discount_label_custom: '20% OFF',
+      discount_label_custom: '',
       coupon_code_custom: 'EMPIRE',
-      discount_pct: 20,
+      discount_pct: undefined,
       badge_custom: 'Audited Partner',
       platforms: 'MT5, cTrader',
       platform_ids: ['mt5', 'ctrader'],
@@ -328,6 +328,8 @@ export default function AdminFirmsPage() {
   const handleStartEdit = (firm: Firm) => {
     setFormData({
       ...firm,
+      discount_pct: firm.discount_pct !== undefined ? firm.discount_pct : (firm.discount_label_custom ? parseInt(firm.discount_label_custom.match(/(\d+)%/)?.[1] || '0', 10) || undefined : undefined),
+      discount_label_custom: firm.discount_label_custom || (firm.discount_pct ? `${firm.discount_pct}% OFF` : ''),
       platform_ids:
         firm.platform_ids ||
         (firm.platforms
@@ -400,8 +402,8 @@ export default function AdminFirmsPage() {
       max_allocation: formData.max_allocation || '$2,000,000',
       profit_split_custom: formData.profit_split_custom || 'Up to 90%',
       payout_custom: formData.payout_custom || 'Bi-Weekly / 14 Days',
-      discount_pct: parseNum(formData.discount_pct, 0),
-      discount_label_custom: formData.discount_label_custom || (formData.discount_pct ? `${formData.discount_pct}% OFF` : 'EXCLUSIVE'),
+      discount_pct: formData.discount_pct !== undefined && formData.discount_pct !== null && !isNaN(Number(formData.discount_pct)) ? Number(formData.discount_pct) : undefined,
+      discount_label_custom: formData.discount_label_custom || (formData.discount_pct && Number(formData.discount_pct) > 0 ? `${formData.discount_pct}% OFF` : ''),
       coupon_code_custom: (formData.coupon_code_custom || 'EMPIRE').toUpperCase(),
       badge_custom: formData.badge_custom || '',
       platforms: formData.platforms || 'MT5, cTrader',
@@ -969,11 +971,12 @@ export default function AdminFirmsPage() {
                   max="100"
                   value={formData.discount_pct ?? ''}
                   onChange={(e) => {
-                    const num = e.target.value === '' ? 0 : Number(e.target.value);
+                    const val = e.target.value.trim();
+                    const num = val === '' ? undefined : Number(val);
                     setFormData({
                       ...formData,
                       discount_pct: num,
-                      discount_label_custom: num > 0 ? `${num}% OFF` : formData.discount_label_custom,
+                      discount_label_custom: num !== undefined && num > 0 ? `${num}% OFF` : (num === 0 ? '' : formData.discount_label_custom),
                     });
                   }}
                   placeholder="e.g. 50"

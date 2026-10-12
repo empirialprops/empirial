@@ -267,6 +267,7 @@ export default function AdminFirmFileSystemPage() {
             buy_url: selectedFirm?.buy_url,
             coupon_code_custom: selectedFirm?.coupon_code_custom,
             discount_label_custom: selectedFirm?.discount_label_custom,
+            discount_pct: selectedFirm?.discount_pct,
             total_payouts: selectedFirm?.total_payouts || activeFallback,
             avg_payout_time: selectedFirm?.avg_payout_time || activeFallback,
             trust_score: selectedFirm?.trust_score || 95,
@@ -309,6 +310,7 @@ export default function AdminFirmFileSystemPage() {
                 buy_url: selectedFirm?.buy_url,
                 coupon_code_custom: selectedFirm?.coupon_code_custom,
                 discount_label_custom: selectedFirm?.discount_label_custom,
+                discount_pct: selectedFirm?.discount_pct,
                 total_payouts: selectedFirm?.total_payouts || activeFallback,
                 avg_payout_time: selectedFirm?.avg_payout_time || activeFallback,
                 trust_score: selectedFirm?.trust_score || 95,
@@ -522,7 +524,8 @@ export default function AdminFirmFileSystemPage() {
         category: parsedPayload.overview.category || 'forex',
         buy_url: parsedPayload.overview.buy_url || 'https://www.orionfunded.com?coupon=EMPIRIAL',
         coupon_code_custom: parsedPayload.overview.coupon_code_custom || 'EMPIRIAL',
-        discount_label_custom: parsedPayload.overview.discount_label_custom || 'SPECIAL OFFER',
+        discount_label_custom: parsedPayload.overview.discount_label_custom || (parsedPayload.overview.discount_pct ? `${parsedPayload.overview.discount_pct}% OFF` : ''),
+        discount_pct: parsedPayload.overview.discount_pct !== undefined ? Number(parsedPayload.overview.discount_pct) : undefined,
         total_payouts: parsedPayload.overview.total_payouts || '$6,600,000+',
         avg_payout_time: parsedPayload.overview.avg_payout_time || '< 5 Hours',
         trust_score: parsedPayload.overview.trust_score || 94,
@@ -1609,6 +1612,24 @@ export default function AdminFirmFileSystemPage() {
                   type="text"
                   value={parsedPayload.overview.coupon_code_custom || ''}
                   onChange={(e) => handleOverviewChange('coupon_code_custom', e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground font-mono"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-muted-foreground font-semibold">Discount Percentage (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={parsedPayload.overview.discount_pct ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value === '' ? undefined : Number(e.target.value);
+                    handleOverviewChange('discount_pct', val);
+                    if (val !== undefined && val > 0) {
+                      handleOverviewChange('discount_label_custom', `${val}% OFF`);
+                    }
+                  }}
                   className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground font-mono"
                 />
               </div>

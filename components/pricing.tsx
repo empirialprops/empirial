@@ -106,7 +106,9 @@ export default function Pricing() {
       return d;
     }
 
-    return `${firm.discount_pct || 20}% OFF`;
+    if (firm.discount_pct) return `${firm.discount_pct}% OFF`;
+    if (firm.discount_label_custom) return firm.discount_label_custom;
+    return "CLAIM DEAL";
   };
 
   const handleCopyCode = (code: string, firmId: string) => {
