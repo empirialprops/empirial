@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { motion } from "framer-motion";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { getSiteSettings } from "@/lib/firebase/services";
@@ -47,8 +46,15 @@ export default function Hero() {
     <div className="relative justify-center items-center bg-transparent w-full">
       <section className="max-w-7xl mx-auto px-4 py-28 gap-12 md:px-8 flex flex-col justify-center items-center relative z-10">
         <div className="flex flex-col justify-center items-center space-y-5 max-w-4xl mx-auto text-center">
-          <h1 className="text-4xl font-medium tracking-tighter mx-auto sm:text-5xl md:text-6xl text-balance bg-gradient-to-b from-sky-800 dark:from-sky-100 to-foreground dark:to-foreground bg-clip-text text-transparent leading-[1.2] py-1 pb-2 sm:pb-3 whitespace-pre-line">
-            {heroData.title}
+          <h1 className="relative mx-auto text-4xl font-medium tracking-tighter sm:text-5xl md:text-6xl text-balance leading-[1.2] py-1 pb-2 sm:pb-3 whitespace-pre-line text-foreground">
+            <span className="block">{heroData.title}</span>
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 block bg-gradient-to-b from-sky-800 dark:from-sky-100 to-foreground dark:to-foreground bg-clip-text text-transparent"
+              style={{ WebkitTextFillColor: "transparent" }}
+            >
+              {heroData.title}
+            </span>
           </h1>
           <p className="max-w-2xl text-base sm:text-lg mx-auto text-muted-foreground text-balance leading-relaxed">
             {heroData.subtitle}
@@ -80,4 +86,3 @@ export default function Hero() {
     </div>
   );
 }
-
