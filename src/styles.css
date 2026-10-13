@@ -1,0 +1,147 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-light: var(--light);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --height-150: 37.5rem;
+}
+
+@layer base {
+  *, ::after, ::before { border-color: var(--border); }
+  button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
+}
+
+@layer base {
+  :root {
+    --background: #ffffff;
+    --foreground: #131316;
+    --muted-foreground: #71717a;
+    --light: #5ba8ff;
+    --card: #ffffff;
+    --card-foreground: #131316;
+    --popover: #ffffff;
+    --popover-foreground: #131316;
+    --primary: #131316;
+    --primary-foreground: #ffffff;
+    --secondary: #f4f4f5;
+    --secondary-foreground: #18181b;
+    --muted: #f4f4f5;
+    --accent: #f4f4f5;
+    --accent-foreground: #18181b;
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+    --border: #e5e5e5;
+    --input: #e5e5e5;
+    --ring: #131316;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: #0A0A0A;
+    --foreground: #ffffff;
+    --muted-foreground: #a1a1aa;
+    --light: #016fee;
+    --card: #141414;
+    --card-foreground: #ffffff;
+    --popover: #141414;
+    --popover-foreground: #ffffff;
+    --primary: #ffffff;
+    --primary-foreground: #0A0A0A;
+    --secondary: #1a1a1a;
+    --secondary-foreground: #ffffff;
+    --muted: #1a1a1a;
+    --accent: #1a1a1a;
+    --accent-foreground: #ffffff;
+    --destructive: #7f1d1d;
+    --destructive-foreground: #ffffff;
+    --border: #242424;
+    --input: #242424;
+    --ring: #ffffff;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  overflow-x: hidden;
+  min-height: 100vh;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* DIAGONAL GRADIENT SHADE */
+.bg-diagonal-shade {
+  background-color: #09090b;
+}
+
+/* ADMIN PORTAL MONOCHROME (B&W) THEME OVERRIDES */
+.admin-portal-bw {
+  --background: #000000;
+  --foreground: #ffffff;
+  --muted-foreground: #a1a1aa;
+  --card: #0A0A0A;
+  --card-foreground: #ffffff;
+  --popover: #0A0A0A;
+  --popover-foreground: #ffffff;
+  --border: #27272a;
+  --input: #27272a;
+  --primary: #ffffff;
+  --primary-foreground: #000000;
+  --secondary: #18181b;
+  --secondary-foreground: #ffffff;
+  --accent: #18181b;
+  --accent-foreground: #ffffff;
+}
+
+/* UPSCALE FONT SIZES IN ADMIN PORTAL GLOBALLY */
+html:has(.admin-portal-bw) {
+  font-size: 18px; /* Scales up all rem-based typography metrics proportionally */
+}
