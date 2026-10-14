@@ -1,7 +1,7 @@
 
 # Replace this value whenever your active Lovable account
 # is connected to a different GitHub source repository.
-source_repo: https://github.com/empirialprops/empirial-victorious
+source_repo: empirialprops/empirial-victorious
 source_branch: main
 target_branch: victusloveablemain
 
