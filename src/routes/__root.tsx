@@ -20,6 +20,7 @@ import { BrandingSync } from "@/components/branding-sync";
 import { TelemetryTracker } from "@/components/analytics/telemetry-tracker";
 import { JsonLd, getOrganizationSchema } from "@/components/seo/json-ld";
 import Script from "next/script";
+import { SupportBot } from "@/components/support-bot/SupportBot";
 
 function NotFoundComponent() {
   return (
@@ -143,6 +144,7 @@ function RootComponent() {
         <main className="flex-1 w-full bg-background">
           <Outlet />
         </main>
+        <SupportBot />
       </ThemeProvider>
     </QueryClientProvider>
   );
