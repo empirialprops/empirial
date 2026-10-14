@@ -21,6 +21,7 @@ import { TelemetryTracker } from "@/components/analytics/telemetry-tracker";
 import { JsonLd, getOrganizationSchema } from "@/components/seo/json-ld";
 import Script from "next/script";
 import { SupportBot } from "@/components/support-bot/SupportBot";
+import { Analytics } from "@vercel/analytics/react";
 
 function NotFoundComponent() {
   return (
@@ -145,6 +146,7 @@ function RootComponent() {
           <Outlet />
         </main>
         <SupportBot />
+        <Analytics />
       </ThemeProvider>
     </QueryClientProvider>
   );
