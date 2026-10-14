@@ -54,18 +54,6 @@
       ],
       "next-themes": [
         "./src/shims/next-themes.tsx"
-      ],
-      "firebase/firestore": [
-        "./src/shims/firebase-firestore.ts"
-      ],
-      "firebase/auth": [
-        "./src/shims/firebase-auth.ts"
-      ],
-      "firebase/app": [
-        "./src/shims/firebase-misc.ts"
-      ],
-      "firebase/storage": [
-        "./src/shims/firebase-misc.ts"
       ]
     },
     "strictNullChecks": true

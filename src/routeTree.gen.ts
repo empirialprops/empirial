@@ -48,10 +48,12 @@ import { Route as AdminSocialRouteImport } from './routes/admin.social'
 import { Route as AdminSpreadsRouteImport } from './routes/admin.spreads'
 import { Route as BlogIndexRouteImport } from './routes/blog.index'
 import { Route as BlogSlugRouteImport } from './routes/blog.$slug'
+import { Route as DiscordCallbackRouteImport } from './routes/discord.callback'
 import { Route as FirmsIndexRouteImport } from './routes/firms.index'
 import { Route as FirmsSlugRouteImport } from './routes/firms.$slug'
 import { Route as AdminChallengesIndexRouteImport } from './routes/admin.challenges.index'
 import { Route as AdminChallengesBatchRouteImport } from './routes/admin.challenges.batch'
+import { Route as ApiAuthDiscordCallbackRouteImport } from './routes/api/auth/discord/callback'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -248,6 +250,11 @@ const BlogSlugRoute = BlogSlugRouteImport.update({
   path: '/blog/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DiscordCallbackRoute = DiscordCallbackRouteImport.update({
+  id: '/discord/callback',
+  path: '/discord/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FirmsIndexRoute = FirmsIndexRouteImport.update({
   id: '/firms/',
   path: '/firms/',
@@ -267,6 +274,11 @@ const AdminChallengesBatchRoute = AdminChallengesBatchRouteImport.update({
   id: '/challenges/batch',
   path: '/challenges/batch',
   getParentRoute: () => AdminRoute,
+} as any)
+const ApiAuthDiscordCallbackRoute = ApiAuthDiscordCallbackRouteImport.update({
+  id: '/api/auth/discord/callback',
+  path: '/api/auth/discord/callback',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -306,6 +318,7 @@ export interface FileRoutesByFullPath {
   '/admin/social': typeof AdminSocialRoute
   '/admin/spreads': typeof AdminSpreadsRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/discord/callback': typeof DiscordCallbackRoute
   '/firms/$slug': typeof FirmsSlugRoute
   '/$category/': typeof CategoryIndexRoute
   '/admin/': typeof AdminIndexRoute
@@ -313,6 +326,7 @@ export interface FileRoutesByFullPath {
   '/firms/': typeof FirmsIndexRoute
   '/admin/challenges/batch': typeof AdminChallengesBatchRoute
   '/admin/challenges/': typeof AdminChallengesIndexRoute
+  '/api/auth/discord/callback': typeof ApiAuthDiscordCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -350,6 +364,7 @@ export interface FileRoutesByTo {
   '/admin/social': typeof AdminSocialRoute
   '/admin/spreads': typeof AdminSpreadsRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/discord/callback': typeof DiscordCallbackRoute
   '/firms/$slug': typeof FirmsSlugRoute
   '/$category': typeof CategoryIndexRoute
   '/admin': typeof AdminIndexRoute
@@ -357,6 +372,7 @@ export interface FileRoutesByTo {
   '/firms': typeof FirmsIndexRoute
   '/admin/challenges/batch': typeof AdminChallengesBatchRoute
   '/admin/challenges': typeof AdminChallengesIndexRoute
+  '/api/auth/discord/callback': typeof ApiAuthDiscordCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -396,6 +412,7 @@ export interface FileRoutesById {
   '/admin/social': typeof AdminSocialRoute
   '/admin/spreads': typeof AdminSpreadsRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/discord/callback': typeof DiscordCallbackRoute
   '/firms/$slug': typeof FirmsSlugRoute
   '/$category/': typeof CategoryIndexRoute
   '/admin/': typeof AdminIndexRoute
@@ -403,6 +420,7 @@ export interface FileRoutesById {
   '/firms/': typeof FirmsIndexRoute
   '/admin/challenges/batch': typeof AdminChallengesBatchRoute
   '/admin/challenges/': typeof AdminChallengesIndexRoute
+  '/api/auth/discord/callback': typeof ApiAuthDiscordCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -443,6 +461,7 @@ export interface FileRouteTypes {
     | '/admin/social'
     | '/admin/spreads'
     | '/blog/$slug'
+    | '/discord/callback'
     | '/firms/$slug'
     | '/$category/'
     | '/admin/'
@@ -450,6 +469,7 @@ export interface FileRouteTypes {
     | '/firms/'
     | '/admin/challenges/batch'
     | '/admin/challenges/'
+    | '/api/auth/discord/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -487,6 +507,7 @@ export interface FileRouteTypes {
     | '/admin/social'
     | '/admin/spreads'
     | '/blog/$slug'
+    | '/discord/callback'
     | '/firms/$slug'
     | '/$category'
     | '/admin'
@@ -494,6 +515,7 @@ export interface FileRouteTypes {
     | '/firms'
     | '/admin/challenges/batch'
     | '/admin/challenges'
+    | '/api/auth/discord/callback'
   id:
     | '__root__'
     | '/'
@@ -532,6 +554,7 @@ export interface FileRouteTypes {
     | '/admin/social'
     | '/admin/spreads'
     | '/blog/$slug'
+    | '/discord/callback'
     | '/firms/$slug'
     | '/$category/'
     | '/admin/'
@@ -539,6 +562,7 @@ export interface FileRouteTypes {
     | '/firms/'
     | '/admin/challenges/batch'
     | '/admin/challenges/'
+    | '/api/auth/discord/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -559,10 +583,12 @@ export interface RootRouteChildren {
   CategoryChallengesRoute: typeof CategoryChallengesRoute
   CategoryDealsRoute: typeof CategoryDealsRoute
   BlogSlugRoute: typeof BlogSlugRoute
+  DiscordCallbackRoute: typeof DiscordCallbackRoute
   FirmsSlugRoute: typeof FirmsSlugRoute
   CategoryIndexRoute: typeof CategoryIndexRoute
   BlogIndexRoute: typeof BlogIndexRoute
   FirmsIndexRoute: typeof FirmsIndexRoute
+  ApiAuthDiscordCallbackRoute: typeof ApiAuthDiscordCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -840,6 +866,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BlogSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/discord/callback': {
+      id: '/discord/callback'
+      path: '/discord/callback'
+      fullPath: '/discord/callback'
+      preLoaderRoute: typeof DiscordCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/firms/': {
       id: '/firms/'
       path: '/firms'
@@ -867,6 +900,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/challenges/batch'
       preLoaderRoute: typeof AdminChallengesBatchRouteImport
       parentRoute: typeof AdminRoute
+    }
+    '/api/auth/discord/callback': {
+      id: '/api/auth/discord/callback'
+      path: '/api/auth/discord/callback'
+      fullPath: '/api/auth/discord/callback'
+      preLoaderRoute: typeof ApiAuthDiscordCallbackRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -941,10 +981,12 @@ const rootRouteChildren: RootRouteChildren = {
   CategoryChallengesRoute: CategoryChallengesRoute,
   CategoryDealsRoute: CategoryDealsRoute,
   BlogSlugRoute: BlogSlugRoute,
+  DiscordCallbackRoute: DiscordCallbackRoute,
   FirmsSlugRoute: FirmsSlugRoute,
   CategoryIndexRoute: CategoryIndexRoute,
   BlogIndexRoute: BlogIndexRoute,
   FirmsIndexRoute: FirmsIndexRoute,
+  ApiAuthDiscordCallbackRoute: ApiAuthDiscordCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
