@@ -1,0 +1,25 @@
+
+name: Lovable Sync
+
+on:
+  repository_dispatch:
+    types: [lovable-sync]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Preview changes without opening a PR
+        type: boolean
+        required: true
+        default: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    uses: infinity-constellation/lovable-sync/.github/workflows/sync.yml@main
+    with:
+      dry_run: ${{ inputs.dry_run || false }}
+    secrets:
+      source_repo_token: ${{ secrets.LOVABLE_SYNC_TOKEN }}
