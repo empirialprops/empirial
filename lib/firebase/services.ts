@@ -159,8 +159,11 @@ export function subscribeToOfferPoster(callback: (posterConfig: any) => void): (
   try {
     const docRef = doc(db, 'siteSettings', 'main');
     return onSnapshot(docRef, (snap) => {
-      if (snap.exists() && snap.data().offerPoster) {
-        callback(snap.data().offerPoster);
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data && 'offerPoster' in data) {
+          callback(data.offerPoster);
+        }
       }
     });
   } catch (err) {

@@ -23,11 +23,13 @@ import {
   SlidersHorizontal,
   Eye,
   Upload,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { MOCK_DEALS } from '@/lib/data/deals-data';
 import { MOCK_FIRMS } from '@/lib/data/firms-data';
 import { Firm, Deal } from '@/lib/types';
-import { getDeals, getFirms, createDeal, updateDeal, deleteDeal } from '@/lib/firebase/services';
+import { getDeals, getFirms, createDeal, updateDeal, deleteDeal, subscribeToOfferPoster } from '@/lib/firebase/services';
 import {
   getStoredDeals,
   addStoredDeal,
@@ -38,8 +40,10 @@ import {
 import {
   OfferPosterConfig,
   getStoredOfferPoster,
+  fetchOfferPoster,
   saveOfferPoster,
   resetOfferPoster,
+  compressPosterImage,
   DEFAULT_OFFER_POSTER,
 } from '@/lib/utils/offer-popup-store';
 
@@ -69,7 +73,11 @@ export default function AdminDealsPage() {
 
   // Offer Poster Config State
   const [posterConfig, setPosterConfig] = useState<OfferPosterConfig>(DEFAULT_OFFER_POSTER);
+  const [isPosterSaving, setIsPosterSaving] = useState(false);
   const [isPosterSaved, setIsPosterSaved] = useState(false);
+  const [posterError, setPosterError] = useState<string | null>(null);
+  const [isCompressingPoster, setIsCompressingPoster] = useState(false);
+  const [posterImageMeta, setPosterImageMeta] = useState<string | null>(null);
   const [showPosterPreview, setShowPosterPreview] = useState(false);
   const [benefitsText, setBenefitsText] = useState('');
 
@@ -107,9 +115,33 @@ export default function AdminDealsPage() {
   });
 
   useEffect(() => {
+    // 1. Initial cached config
     const loadedPoster = getStoredOfferPoster();
     setPosterConfig(loadedPoster);
     setBenefitsText((loadedPoster.benefits || []).join('\n'));
+
+    // 2. Fetch live config from cloud so admin always sees current live settings on any device
+    fetchOfferPoster().then((liveConfig) => {
+      if (liveConfig) {
+        setPosterConfig(liveConfig);
+        setBenefitsText((liveConfig.benefits || []).join('\n'));
+      }
+    }).catch(() => {});
+
+    // 3. Real-time subscription so admin panel stays synced if updated from another tab or device
+    const unsubPoster = subscribeToOfferPoster((remoteConfig) => {
+      if (remoteConfig) {
+        setPosterConfig((prev) => {
+          const prevTime = prev.updatedAt || 0;
+          const remoteTime = remoteConfig.updatedAt || 0;
+          if (remoteTime >= prevTime) {
+            setBenefitsText((remoteConfig.benefits || []).join('\n'));
+            return { ...DEFAULT_OFFER_POSTER, ...remoteConfig };
+          }
+          return prev;
+        });
+      }
+    });
 
     async function loadData() {
       try {
@@ -157,6 +189,7 @@ export default function AdminDealsPage() {
     window.addEventListener('empirial_deals_changed', handleDealsChange);
     return () => {
       window.removeEventListener('empirial_deals_changed', handleDealsChange);
+      if (unsubPoster) unsubPoster();
     };
   }, []);
 
@@ -205,47 +238,73 @@ export default function AdminDealsPage() {
     }
   };
 
-  // Handle Poster Image Upload File
-  const handlePosterImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle Poster Image Upload File with Automatic Client-Side Compression for Web & Mobile
+  const handlePosterImageFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      if (evt.target?.result) {
-        setPosterConfig((prev) => ({
-          ...prev,
-          posterImageUrl: evt.target!.result as string,
-        }));
-      }
-    };
-    reader.readAsDataURL(file);
+    setIsCompressingPoster(true);
+    setPosterError(null);
+    try {
+      const compressedDataUrl = await compressPosterImage(file, 900, 1100, 0.75);
+      const estKb = Math.round((compressedDataUrl.length * 0.75) / 1024);
+      setPosterConfig((prev) => ({
+        ...prev,
+        posterImageUrl: compressedDataUrl,
+      }));
+      setPosterImageMeta(`Optimized (${estKb} KB) • Fast load on Web & Mobile`);
+    } catch (err: any) {
+      console.error('Error compressing poster image:', err);
+      setPosterError('Failed to process image. Please try another image file.');
+    } finally {
+      setIsCompressingPoster(false);
+    }
   };
 
-  // Handle Poster Settings Save
-  const handleSavePoster = (e: React.FormEvent) => {
+  // Handle Poster Settings Save (Awaits Firestore sync to update website, mobile & admin)
+  const handleSavePoster = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanedBenefits = benefitsText
-      .split('\n')
-      .map((b) => b.trim())
-      .filter(Boolean);
+    setIsPosterSaving(true);
+    setPosterError(null);
+    try {
+      const cleanedBenefits = benefitsText
+        .split('\n')
+        .map((b) => b.trim())
+        .filter(Boolean);
 
-    const finalConfig: OfferPosterConfig = {
-      ...posterConfig,
-      benefits: cleanedBenefits.length > 0 ? cleanedBenefits : posterConfig.benefits || [],
-    };
+      const finalConfig: OfferPosterConfig = {
+        ...posterConfig,
+        benefits: cleanedBenefits.length > 0 ? cleanedBenefits : posterConfig.benefits || [],
+      };
 
-    saveOfferPoster(finalConfig);
-    setPosterConfig(finalConfig);
-    setIsPosterSaved(true);
-    setTimeout(() => setIsPosterSaved(false), 2500);
+      const saved = await saveOfferPoster(finalConfig);
+      setPosterConfig(saved);
+      setIsPosterSaved(true);
+      setTimeout(() => setIsPosterSaved(false), 3500);
+    } catch (err: any) {
+      console.error('Failed to save offer poster:', err);
+      setPosterError(err?.message || 'Failed to save offer poster to cloud database. Please verify connection.');
+    } finally {
+      setIsPosterSaving(false);
+    }
   };
 
-  const handleResetPoster = () => {
-    const defaultConf = resetOfferPoster();
-    setPosterConfig(defaultConf);
-    setBenefitsText((defaultConf.benefits || []).join('\n'));
-    setIsPosterSaved(true);
-    setTimeout(() => setIsPosterSaved(false), 2500);
+  const handleResetPoster = async () => {
+    if (!confirm('Are you sure you want to reset the offer poster to default settings?')) return;
+    setIsPosterSaving(true);
+    setPosterError(null);
+    try {
+      const defaultConf = await resetOfferPoster();
+      setPosterConfig(defaultConf);
+      setBenefitsText((defaultConf.benefits || []).join('\n'));
+      setPosterImageMeta(null);
+      setIsPosterSaved(true);
+      setTimeout(() => setIsPosterSaved(false), 3500);
+    } catch (err: any) {
+      console.error('Failed to reset poster:', err);
+      setPosterError(err?.message || 'Failed to reset offer poster.');
+    } finally {
+      setIsPosterSaving(false);
+    }
   };
 
   // Create New Deal (Requirement 2 & 3)
@@ -503,6 +562,22 @@ export default function AdminDealsPage() {
         </div>
 
         <form onSubmit={handleSavePoster} className="space-y-5">
+          {posterError && (
+            <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{posterError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPosterError(null)}
+                className="text-xs font-semibold hover:underline cursor-pointer ml-3"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
           {/* Poster Image Upload & Preview Grid */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800">
             {/* Poster Thumbnail */}
@@ -511,7 +586,7 @@ export default function AdminDealsPage() {
                 Poster Graphic Preview
               </label>
               {posterConfig.posterImageUrl ? (
-                <div className="relative w-full max-w-[200px] h-[240px] rounded-2xl overflow-hidden border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-950 shadow-md group">
+                <div className="relative w-full max-w-[200px] h-[240px] rounded-2xl overflow-hidden border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-950 shadow-md group flex items-center justify-center">
                   <img
                     src={posterConfig.posterImageUrl}
                     alt="Poster Preview"
@@ -519,7 +594,10 @@ export default function AdminDealsPage() {
                   />
                   <button
                     type="button"
-                    onClick={() => setPosterConfig({ ...posterConfig, posterImageUrl: '' })}
+                    onClick={() => {
+                      setPosterConfig({ ...posterConfig, posterImageUrl: '' });
+                      setPosterImageMeta(null);
+                    }}
                     className="absolute top-2 right-2 p-1.5 rounded-full bg-black/70 text-white hover:bg-rose-600 transition-colors"
                     title="Remove Poster Image"
                   >
@@ -538,14 +616,27 @@ export default function AdminDealsPage() {
             <div className="md:col-span-8 space-y-4 text-xs">
               <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-                  Upload Poster File (Portrait / Banner)
+                  Upload Poster File (Optimized for Mobile & Desktop)
                 </label>
                 <input
                   type="file"
                   accept="image/*"
                   onChange={handlePosterImageFile}
-                  className="w-full text-xs text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-black file:text-white dark:file:bg-white dark:file:text-black cursor-pointer"
+                  disabled={isCompressingPoster}
+                  className="w-full text-xs text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-black file:text-white dark:file:bg-white dark:file:text-black cursor-pointer disabled:opacity-50"
                 />
+                {isCompressingPoster && (
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground animate-pulse mt-1.5">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-foreground" />
+                    <span>Compressing & optimizing graphic for mobile & desktop...</span>
+                  </div>
+                )}
+                {posterImageMeta && !isCompressingPoster && (
+                  <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1.5 flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5" />
+                    <span>{posterImageMeta}</span>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -555,7 +646,10 @@ export default function AdminDealsPage() {
                 <input
                   type="text"
                   value={posterConfig.posterImageUrl || ''}
-                  onChange={(e) => setPosterConfig({ ...posterConfig, posterImageUrl: e.target.value })}
+                  onChange={(e) => {
+                    setPosterConfig({ ...posterConfig, posterImageUrl: e.target.value });
+                    setPosterImageMeta(null);
+                  }}
                   placeholder="https://images.unsplash.com/photo-..."
                   className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-foreground focus:outline-none"
                 />
@@ -695,12 +789,13 @@ export default function AdminDealsPage() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-3 border-t border-zinc-100 dark:border-zinc-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-zinc-100 dark:border-zinc-800">
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={handleResetPoster}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                disabled={isPosterSaving}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-50"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Reset to Default</span>
@@ -716,18 +811,28 @@ export default function AdminDealsPage() {
               </button>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 self-end sm:self-auto">
               {isPosterSaved && (
-                <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                  <Check className="w-3.5 h-3.5" /> Saved & Live!
+                <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 animate-in fade-in">
+                  <Check className="w-4 h-4" /> Live on Web, Mobile & Admin!
                 </span>
               )}
               <button
                 type="submit"
-                className="flex items-center gap-2 px-5 py-2 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-bold transition-all cursor-pointer shadow-xs"
+                disabled={isPosterSaving || isCompressingPoster}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Save className="w-3.5 h-3.5" />
-                <span>Save Poster Settings</span>
+                {isPosterSaving ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Syncing Across All Devices...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Save Poster Settings</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -1356,99 +1461,109 @@ export default function AdminDealsPage() {
         </div>
       </div>
 
-      {/* Live Poster Popup Preview Modal */}
+      {/* Live Poster Popup Preview Modal (Matches Mobile & Desktop Formats) */}
       {showPosterPreview && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150">
-          <div className="relative w-full max-w-4xl max-h-[92vh] overflow-y-auto rounded-[32px] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0A0A0A] p-6 sm:p-8 shadow-2xl space-y-6">
-            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5 md:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto">
+          <div className="relative w-full max-w-4xl lg:max-w-5xl max-h-[92vh] overflow-y-auto rounded-[24px] sm:rounded-[32px] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0A0A0A] p-4 sm:p-6 md:p-8 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
               <div className="flex items-center gap-2">
-                <Eye className="w-5 h-5 text-foreground" />
-                <h3 className="text-base font-bold text-foreground">Live Offer Poster Popup Preview</h3>
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-muted-foreground font-semibold">
-                  {posterConfig.layoutStructure === 'stacked' ? 'Stacked Layout' : 'Side-by-Side Layout'}
+                <Eye className="w-4 h-4 text-foreground" />
+                <h3 className="text-sm sm:text-base font-bold text-foreground">Live Offer Poster Popup Preview</h3>
+                <span className="text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-muted-foreground font-semibold">
+                  {posterConfig.layoutStructure === 'stacked' ? 'Stacked Layout' : 'Side-by-Side'}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setShowPosterPreview(false)}
-                className="p-2 rounded-full text-muted-foreground hover:text-foreground bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full text-muted-foreground hover:text-foreground bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 transition-colors cursor-pointer flex items-center justify-center"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-5">
-              <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full border border-black dark:border-white bg-zinc-100 dark:bg-zinc-900 text-xs font-semibold text-foreground tracking-wide uppercase">
-                <Sparkles className="w-3.5 h-3.5 fill-current" />
+            <div className="space-y-4">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-black dark:border-white bg-zinc-100 dark:bg-zinc-900 text-[10px] sm:text-xs font-semibold text-foreground tracking-wide uppercase">
+                <Sparkles className="w-3 h-3 fill-current" />
                 <span>{posterConfig.badge || 'SPECIAL OFFER'}</span>
               </div>
 
               {posterConfig.layoutStructure === 'stacked' ? (
-                <div className="space-y-5">
+                <div className="space-y-4 text-center">
                   {posterConfig.posterImageUrl && (
                     <div className="w-full flex justify-center">
-                      <img
-                        src={posterConfig.posterImageUrl}
-                        alt={posterConfig.title}
-                        className="w-full max-h-[300px] object-cover rounded-2xl border-2 border-zinc-200 dark:border-zinc-800"
-                      />
+                      <div className="relative w-full max-w-[220px] sm:max-w-[320px] md:max-w-[420px] rounded-2xl overflow-hidden border-2 border-zinc-200 dark:border-zinc-800 shadow-xl bg-zinc-950 flex items-center justify-center">
+                        <img
+                          src={posterConfig.posterImageUrl}
+                          alt={posterConfig.title}
+                          className="w-full h-auto object-cover max-h-[200px] sm:max-h-[280px] md:max-h-[440px] rounded-2xl"
+                        />
+                      </div>
                     </div>
                   )}
-                  <div className="space-y-2">
-                    <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+                  <div className="space-y-1">
+                    <h2 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
                       {posterConfig.title}
                     </h2>
-                    <p className="text-sm text-muted-foreground">{posterConfig.subtitle}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto">{posterConfig.subtitle}</p>
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6 items-center">
                   {posterConfig.posterImageUrl && (
                     <div className="md:col-span-5 flex justify-center">
-                      <img
-                        src={posterConfig.posterImageUrl}
-                        alt={posterConfig.title}
-                        className="w-full max-h-[380px] object-cover rounded-2xl border-2 border-zinc-200 dark:border-zinc-800 shadow-lg"
-                      />
+                      <div className="relative w-full max-w-[220px] sm:max-w-[280px] md:max-w-none rounded-2xl overflow-hidden border-2 border-zinc-200 dark:border-zinc-800 shadow-xl bg-zinc-950 flex items-center justify-center">
+                        <img
+                          src={posterConfig.posterImageUrl}
+                          alt={posterConfig.title}
+                          className="w-full h-auto object-cover max-h-[220px] sm:max-h-[300px] md:max-h-[500px] rounded-2xl"
+                        />
+                      </div>
                     </div>
                   )}
-                  <div className={`${posterConfig.posterImageUrl ? 'md:col-span-7' : 'md:col-span-12'} space-y-4`}>
+                  <div className={`${posterConfig.posterImageUrl ? 'md:col-span-7' : 'md:col-span-12'} space-y-3`}>
                     <div>
-                      <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+                      <h2 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-foreground leading-tight">
                         {posterConfig.title}
                       </h2>
-                      <p className="text-sm text-muted-foreground mt-1">{posterConfig.subtitle}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground mt-1">{posterConfig.subtitle}</p>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3">
-                      {posterConfig.discountTag && (
-                        <span className="px-3 py-1 rounded-xl bg-black text-white dark:bg-white dark:text-black font-bold text-xs">
+                    <div className="p-3 sm:p-4 rounded-2xl border-2 border-black dark:border-white bg-[#f4f4f5] dark:bg-zinc-900/80 flex flex-wrap items-center justify-between gap-2.5 shadow-xs">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">
+                          Max Discount
+                        </span>
+                        <span className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight">
                           {posterConfig.discountTag}
                         </span>
-                      )}
+                      </div>
                       {posterConfig.couponCode && (
-                        <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 font-mono font-bold text-xs">
-                          <span>CODE: {posterConfig.couponCode}</span>
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 font-mono font-bold text-xs text-foreground">
+                          <Tag className="w-3.5 h-3.5 text-muted-foreground" />
+                          <span>{posterConfig.couponCode}</span>
                         </div>
                       )}
                     </div>
 
                     {posterConfig.benefits && posterConfig.benefits.length > 0 && (
-                      <div className="space-y-1.5 pt-2">
+                      <div className="space-y-1 pt-1">
                         {posterConfig.benefits.map((b, idx) => (
                           <div key={idx} className="flex items-center gap-2 text-xs text-foreground font-medium">
-                            <Check className="w-3.5 h-3.5 text-foreground shrink-0" />
+                            <div className="w-4 h-4 rounded-full bg-black text-white dark:bg-white dark:text-black flex items-center justify-center text-[9px] font-extrabold shrink-0">
+                              {idx + 1}
+                            </div>
                             <span>{b}</span>
                           </div>
                         ))}
                       </div>
                     )}
 
-                    <div className="pt-2">
+                    <div className="pt-1">
                       <button
                         type="button"
                         onClick={() => alert(`Destination URL: ${posterConfig.buttonLink || '#'}`)}
-                        className="w-full sm:w-auto px-6 py-3 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-bold transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+                        className="w-full sm:w-auto px-5 py-3 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-bold transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
                       >
                         <span>{posterConfig.buttonText || 'Claim Offer'}</span>
                         <ExternalLink className="w-4 h-4" />

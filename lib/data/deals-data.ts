@@ -128,5 +128,21 @@ export const MOCK_DEALS: Deal[] = [
     is_verified: true,
     created_at: '2026-01-01',
     category: 'crypto'
+  },
+  {
+    id: 'deal-fundedhive-empirial',
+    firm_id: 'funded-hive',
+    firm_name: 'Funded Hive',
+    firm_slug: 'funded-hive',
+    firm_logo: '/logos/funded-hive.svg',
+    code: 'EMPIRIAL',
+    discount_pct: 20,
+    discount_label: 'Exclusive 20% OFF Funded Hive with Code EMPIRIAL',
+    description: 'Use partner promo code EMPIRIAL for 20% discount on NewBee, WorkerBee, QueenBee, 1-StepBee, 2-StepBee, and Instant Growth accounts.',
+    affiliate_url: 'https://fundedhive.com/?ref=empirial',
+    is_featured: true,
+    is_verified: true,
+    created_at: '2026-01-01',
+    category: 'forex'
   }
 ];
