@@ -45,3 +45,4 @@ export function answerText(input: string, d: BotData): BotReply {
   for (const [id, re] of KEYWORDS) if (re.test(q)) return answerIntent(id, d);
   return A.fallback();
 }
+
