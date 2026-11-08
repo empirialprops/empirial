@@ -161,22 +161,28 @@ export default function NavBar() {
   return (
     <>
       <AuthModal />
-      <nav
-        className={`sticky top-0 z-50 w-full transition-[background-color,backdrop-filter] duration-300 ease-out ${
-          showNavbarBlur
-            ? "backdrop-blur-md bg-background/80 border-b border-border"
-            : "bg-transparent"
-        }`}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+      <nav className="sticky top-3 z-50 w-full px-3 sm:px-5 lg:px-8">
+        <motion.div
+          initial={{ y: -56, opacity: 0 }}
+          animate={{ y: [0, -4, 0], opacity: 1 }}
+          transition={{
+            y: { duration: 5, repeat: Infinity, ease: "easeInOut" },
+            opacity: { duration: 0.5, ease: "easeOut" },
+          }}
+          className={`max-w-7xl mx-auto rounded-[2rem] border backdrop-blur-2xl backdrop-saturate-150 transition-[box-shadow,border-color,background-color] duration-300 ease-out ${
+            showNavbarBlur
+              ? "bg-white/80 dark:bg-[#0A0A0A]/80 border-zinc-200/80 dark:border-zinc-800/80 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.15)] dark:shadow-[0_12px_40px_-10px_rgba(0,0,0,0.7)]"
+              : "bg-white/60 dark:bg-[#0A0A0A]/60 border-zinc-200/50 dark:border-zinc-800/50 shadow-[0_10px_32px_-16px_rgba(0,0,0,0.08)] dark:shadow-[0_10px_32px_-14px_rgba(0,0,0,0.55)]"
+          }`}
+        >
+          <div className="flex justify-between items-center h-16 px-4 sm:px-5">
             {/* Mobile menu button */}
             <div className="flex sm:hidden">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="relative"
+                className="relative rounded-full"
                 aria-label="Toggle menu"
               >
                 <motion.div
@@ -194,11 +200,11 @@ export default function NavBar() {
             </div>
 
             {/* Desktop Navigation */}
-            <div className="hidden sm:flex items-center space-x-6 md:space-x-8">
+            <div className="hidden sm:flex items-center space-x-4 md:space-x-6">
               <EmpirialLogo height={36} />
 
               {navItems.map((item) => (
-                <Button asChild key={item.name} variant="ghost" size="sm" className="font-medium text-muted-foreground hover:text-foreground">
+                <Button asChild key={item.name} variant="ghost" size="sm" className="rounded-full px-3.5 font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/70 dark:hover:bg-zinc-800/70 transition-colors">
                   <Link href={item.href}>{item.name}</Link>
                 </Button>
               ))}
@@ -206,17 +212,17 @@ export default function NavBar() {
               {/* Browse Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="font-medium text-muted-foreground hover:text-foreground">
+                  <Button variant="ghost" size="sm" className="group rounded-full px-3.5 font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/70 dark:hover:bg-zinc-800/70 transition-colors">
                     Browse
-                    <ChevronDownIcon className="ml-1 h-4 w-4" />
+                    <ChevronDownIcon className="ml-1 h-4 w-4 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-72 p-1.5 rounded-2xl bg-white dark:bg-[#141414] backdrop-blur-md border border-zinc-200 dark:border-zinc-800 shadow-xl space-y-0.5">
+                <DropdownMenuContent className="w-72 p-2 rounded-[1.75rem] bg-white/95 dark:bg-[#0A0A0A]/95 backdrop-blur-2xl backdrop-saturate-150 border border-zinc-200/80 dark:border-zinc-800/80 shadow-[0_16px_48px_-16px_rgba(0,0,0,0.2)] dark:shadow-[0_16px_48px_-14px_rgba(0,0,0,0.75)] space-y-0.5">
                   {browseItems.map((item) => (
                     <DropdownMenuItem
                       key={item.title}
                       asChild
-                      className="group p-2.5 rounded-xl cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800/80 focus:bg-zinc-100 dark:focus:bg-zinc-800/80 data-[highlighted]:bg-zinc-100 dark:data-[highlighted]:bg-zinc-800/80 transition-colors outline-none"
+                      className="group p-2.5 rounded-[1.4rem] cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-900 focus:bg-zinc-100 dark:focus:bg-zinc-900 data-[highlighted]:bg-zinc-100 dark:data-[highlighted]:bg-zinc-900 transition-colors outline-none"
                     >
                       <Link href={item.href} className="flex items-start w-full">
                         {item.icon}
@@ -243,9 +249,9 @@ export default function NavBar() {
                   <DropdownMenuTrigger asChild>
                     <button
                       type="button"
-                      className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 transition-all shadow-xs cursor-pointer"
+                      className="hidden sm:inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 transition-all shadow-xs cursor-pointer"
                     >
-                      <div className="w-6 h-6 rounded-lg bg-zinc-800 dark:bg-zinc-200 overflow-hidden flex items-center justify-center text-[10px] font-extrabold shrink-0 border border-white/20 dark:border-black/20">
+                      <div className="w-6 h-6 rounded-full bg-zinc-800 dark:bg-zinc-200 overflow-hidden flex items-center justify-center text-[10px] font-extrabold shrink-0 border border-white/20 dark:border-black/20">
                         {currentUser.avatarUrl ? (
                           <img
                             src={currentUser.avatarUrl}
@@ -262,50 +268,50 @@ export default function NavBar() {
                       <ChevronDownIcon className="w-3.5 h-3.5 opacity-70" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-64 p-1.5 rounded-2xl bg-white dark:bg-[#141414] backdrop-blur-md border border-zinc-200 dark:border-zinc-800 shadow-xl space-y-0.5">
-                    <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/80 mb-1 space-y-1">
+                  <DropdownMenuContent align="end" className="w-64 p-2 rounded-[1.75rem] bg-white/95 dark:bg-[#0A0A0A]/95 backdrop-blur-2xl backdrop-saturate-150 border border-zinc-200/80 dark:border-zinc-800/80 shadow-[0_16px_48px_-16px_rgba(0,0,0,0.2)] dark:shadow-[0_16px_48px_-14px_rgba(0,0,0,0.75)] space-y-0.5">
+                    <div className="p-2.5 rounded-[1.4rem] bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/80 mb-1 space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-xs text-foreground truncate">{currentUser.displayName}</span>
+                        <span className="font-bold text-xs text-zinc-900 dark:text-white truncate">{currentUser.displayName}</span>
                         <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
                           Verified
                         </span>
                       </div>
-                      <p className="text-[11px] text-muted-foreground truncate">{currentUser.email}</p>
+                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">{currentUser.email}</p>
                     </div>
 
-                    <DropdownMenuItem asChild className="p-2 rounded-xl cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800/80 focus:bg-zinc-100 dark:focus:bg-zinc-800/80 data-[highlighted]:bg-zinc-100 dark:data-[highlighted]:bg-zinc-800/80 transition-colors outline-none">
+                    <DropdownMenuItem asChild className="p-2 rounded-[1.4rem] cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-900 focus:bg-zinc-100 dark:focus:bg-zinc-900 data-[highlighted]:bg-zinc-100 dark:data-[highlighted]:bg-zinc-900 transition-colors outline-none">
                       <Link href="/profile" className="flex items-center gap-2 text-xs font-semibold text-zinc-900 dark:text-zinc-100">
-                        <User className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-400" />
+                        <User className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
                         <span>Trader Dashboard</span>
                       </Link>
                     </DropdownMenuItem>
 
-                    <DropdownMenuItem asChild className="p-2 rounded-xl cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800/80 focus:bg-zinc-100 dark:focus:bg-zinc-800/80 data-[highlighted]:bg-zinc-100 dark:data-[highlighted]:bg-zinc-800/80 transition-colors outline-none">
+                    <DropdownMenuItem asChild className="p-2 rounded-[1.4rem] cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-900 focus:bg-zinc-100 dark:focus:bg-zinc-900 data-[highlighted]:bg-zinc-100 dark:data-[highlighted]:bg-zinc-900 transition-colors outline-none">
                       <Link href="/profile" className="flex items-center gap-2 text-xs font-semibold text-zinc-900 dark:text-zinc-100">
-                        <Star className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-400" />
+                        <Star className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
                         <span>My Reviews</span>
                       </Link>
                     </DropdownMenuItem>
 
-                    <DropdownMenuItem asChild className="p-2 rounded-xl cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800/80 focus:bg-zinc-100 dark:focus:bg-zinc-800/80 data-[highlighted]:bg-zinc-100 dark:data-[highlighted]:bg-zinc-800/80 transition-colors outline-none">
+                    <DropdownMenuItem asChild className="p-2 rounded-[1.4rem] cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-900 focus:bg-zinc-100 dark:focus:bg-zinc-900 data-[highlighted]:bg-zinc-100 dark:data-[highlighted]:bg-zinc-900 transition-colors outline-none">
                       <Link href="/profile" className="flex items-center gap-2 text-xs font-semibold text-zinc-900 dark:text-zinc-100">
-                        <Calendar className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-400" />
+                        <Calendar className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
                         <span>Registered Events</span>
                       </Link>
                     </DropdownMenuItem>
 
-                    <DropdownMenuItem asChild className="p-2 rounded-xl cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800/80 focus:bg-zinc-100 dark:focus:bg-zinc-800/80 data-[highlighted]:bg-zinc-100 dark:data-[highlighted]:bg-zinc-800/80 transition-colors outline-none">
+                    <DropdownMenuItem asChild className="p-2 rounded-[1.4rem] cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-900 focus:bg-zinc-100 dark:focus:bg-zinc-900 data-[highlighted]:bg-zinc-100 dark:data-[highlighted]:bg-zinc-900 transition-colors outline-none">
                       <Link href="/profile" className="flex items-center gap-2 text-xs font-semibold text-zinc-900 dark:text-zinc-100">
-                        <Ticket className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-400" />
+                        <Ticket className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
                         <span>Contact Support</span>
                       </Link>
                     </DropdownMenuItem>
 
-                    <DropdownMenuSeparator className="my-1 bg-zinc-100 dark:bg-zinc-800" />
+                    <DropdownMenuSeparator className="my-1 bg-zinc-200 dark:bg-zinc-800" />
 
                     <DropdownMenuItem
                       onClick={() => logoutUser()}
-                      className="p-2 rounded-xl cursor-pointer text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 focus:bg-rose-50 dark:focus:bg-rose-950/40 data-[highlighted]:bg-rose-50 dark:data-[highlighted]:bg-rose-950/40 transition-colors outline-none flex items-center gap-2"
+                      className="p-2 rounded-[1.4rem] cursor-pointer text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 focus:bg-rose-50 dark:focus:bg-rose-950/40 data-[highlighted]:bg-rose-50 dark:data-[highlighted]:bg-rose-950/40 transition-colors outline-none flex items-center gap-2"
                     >
                       <LogOut className="w-3.5 h-3.5" />
                       <span>Disconnect Wallet / Account</span>
@@ -316,7 +322,7 @@ export default function NavBar() {
                 /* Disconnected State: Connect Button */
                 <Button
                   onClick={openAuthModal}
-                  className="hidden sm:inline-flex items-center gap-2 rounded-xl font-semibold px-4 h-9 bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 transition-colors shadow-xs cursor-pointer text-xs"
+                  className="hidden sm:inline-flex items-center gap-2 rounded-full font-semibold px-5 h-9 bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 transition-all shadow-xs cursor-pointer text-xs"
                   size="sm"
                 >
                   <User className="w-3.5 h-3.5" />
@@ -343,7 +349,7 @@ export default function NavBar() {
                   animate={{ y: 0 }}
                   exit={{ y: -20 }}
                   transition={{ duration: 0.3, delay: 0.1 }}
-                  className="px-2 pt-2 pb-4 space-y-1"
+                  className="px-4 pt-2 pb-5 space-y-1"
                 >
                   {navItems.map((item, index) => (
                     <motion.div
@@ -354,7 +360,7 @@ export default function NavBar() {
                     >
                       <Link
                         href={item.href}
-                        className="block px-3 py-2 text-base font-medium text-foreground hover:bg-muted rounded-xl transition-colors"
+                        className="block px-3 py-2 text-base font-medium text-foreground hover:bg-muted/80 rounded-2xl transition-colors"
                         onClick={() => setIsMenuOpen(false)}
                       >
                         {item.name}
@@ -362,7 +368,7 @@ export default function NavBar() {
                     </motion.div>
                   ))}
 
-                  <div className="pt-2 border-t border-border">
+                  <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800">
                     <div className="px-3 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Browse
                     </div>
@@ -370,7 +376,7 @@ export default function NavBar() {
                       <Link
                         key={item.title}
                         href={item.href}
-                        className="flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted rounded-xl transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted/80 rounded-2xl transition-colors"
                         onClick={() => setIsMenuOpen(false)}
                       >
                         {item.icon}
@@ -384,9 +390,9 @@ export default function NavBar() {
                       <Link
                         href="/profile"
                         onClick={() => setIsMenuOpen(false)}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 transition-colors shadow-xs"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-full text-sm font-bold bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 transition-colors shadow-xs"
                       >
-                        <div className="w-5 h-5 rounded bg-zinc-800 dark:bg-zinc-200 overflow-hidden flex items-center justify-center text-[10px] shrink-0">
+                        <div className="w-5 h-5 rounded-full bg-zinc-800 dark:bg-zinc-200 overflow-hidden flex items-center justify-center text-[10px] shrink-0">
                           {currentUser.avatarUrl ? (
                             <img src={currentUser.avatarUrl} alt={currentUser.displayName} className="w-full h-full object-cover" />
                           ) : (
@@ -401,7 +407,7 @@ export default function NavBar() {
                           setIsMenuOpen(false);
                           openAuthModal();
                         }}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 transition-colors shadow-xs"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 transition-colors shadow-xs cursor-pointer"
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -421,7 +427,7 @@ export default function NavBar() {
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
+        </motion.div>
       </nav>
     </>
   );
