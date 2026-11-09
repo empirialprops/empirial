@@ -48,6 +48,8 @@ export interface FirmImportPayload {
   firm_slug?: string;
   fallback_placeholder?: string; // e.g. "NO INFO", "N/A"
   overview: {
+    logo_url?: string;
+    logo_shape?: string;
     headquarters?: string;
     founded_year?: number;
     rating?: number;
@@ -679,16 +681,25 @@ export async function commitFirmImport(
   // Update or add in local store
   const currentFirms = getStoredFirms();
   const firmExists = currentFirms.some((f) => f.id === targetFirm.id || f.slug === targetFirm.slug);
+  const fullFirmData: Firm = {
+    ...targetFirm,
+    ...firmUpdates,
+    id: targetFirm.id || targetFirm.slug || payload.firm_slug || payload.firm_name.toLowerCase().replace(/\s+/g, '-'),
+    name: targetFirm.name || payload.firm_name,
+    slug: targetFirm.slug || payload.firm_slug || (targetFirm.name || payload.firm_name).toLowerCase().replace(/\s+/g, '-'),
+    logo_url: payload.overview.logo_url || targetFirm.logo_url || `/logos/${targetFirm.slug || payload.firm_slug}.svg`,
+  };
+
   if (firmExists) {
-    updateStoredFirm(targetFirm.id, firmUpdates);
+    updateStoredFirm(targetFirm.id, fullFirmData);
   } else {
-    addStoredFirm({ ...targetFirm, ...firmUpdates });
+    addStoredFirm(fullFirmData);
   }
 
   // Update Firestore if online
   if (db) {
     try {
-      await updateFirm(targetFirm.id, firmUpdates);
+      await updateFirm(fullFirmData.id, fullFirmData);
     } catch (err) {
       console.warn('Firestore updateFirm failed, proceeding with local store:', err);
     }

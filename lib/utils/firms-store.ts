@@ -95,6 +95,7 @@ export function saveStoredFirms(firms: Firm[]): void {
     localStorage.setItem(INITIALIZED_KEY, 'true');
     localStorage.setItem(STORAGE_KEY, JSON.stringify(firms));
     window.dispatchEvent(new CustomEvent('empirial_firms_changed', { detail: firms }));
+    window.dispatchEvent(new CustomEvent('firms-changed', { detail: firms }));
   } catch (err) {
     console.error('Failed to save firms to localStorage:', err);
   }

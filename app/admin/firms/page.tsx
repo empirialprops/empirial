@@ -30,6 +30,13 @@ import Link from 'next/link';
 import { MOCK_FIRMS } from '@/lib/data/firms-data';
 import { Firm } from '@/lib/types';
 import { getFirms, createFirm, updateFirm, deleteFirm } from '@/lib/firebase/services';
+import {
+  getStoredFirms,
+  saveStoredFirms,
+  addStoredFirm,
+  updateStoredFirm,
+  deleteStoredFirm,
+} from '@/lib/utils/firms-store';
 import { logAdminAction } from '@/lib/utils/audit-log-store';
 import { PlatformItem, getStoredPlatforms } from '@/lib/utils/platforms-store';
 
@@ -69,6 +76,8 @@ export default function AdminFirmsPage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [isAdding, setIsAdding] = useState(false);
   const [editingFirm, setEditingFirm] = useState<Firm | null>(null);
+  const [isGlobalSaving, setIsGlobalSaving] = useState(false);
+  const [globalSaveFeedback, setGlobalSaveFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Custom Directory Filters State
   const [customDirectoryFilters, setCustomDirectoryFilters] = useState<string[]>([
@@ -146,25 +155,60 @@ export default function AdminFirmsPage() {
   }, []);
 
   useEffect(() => {
+    // 1. Initial fast load from local storage
+    const local = getStoredFirms();
+    if (local && local.length > 0) {
+      setFirms(local);
+      setLoading(false);
+    }
+
+    // 2. Fetch live database from Firestore and merge
     async function loadFirms() {
       try {
         const data = await getFirms();
         if (data && data.length > 0) {
-          const uniqueFirms = Array.from(new Map(data.map((item) => [item.id || item.slug, item])).values());
-          setFirms(uniqueFirms);
-        } else {
+          const map = new Map<string, Firm>();
+          // Preserve local additions first
+          local.forEach((f) => map.set(f.id || f.slug, f));
+          // Merge with live Firestore records
+          data.forEach((f) => {
+            const key = f.id || f.slug;
+            map.set(key, { ...(map.get(key) || {}), ...f });
+          });
+          const merged = Array.from(map.values());
+          setFirms(merged);
+          saveStoredFirms(merged);
+        } else if (!local || local.length === 0) {
+          const uniqueMocks = Array.from(new Map(MOCK_FIRMS.map((item) => [item.id, item])).values());
+          setFirms(uniqueMocks);
+          saveStoredFirms(uniqueMocks);
+        }
+      } catch (err) {
+        console.error('Failed to load firms from Firestore:', err);
+        if (!local || local.length === 0) {
           const uniqueMocks = Array.from(new Map(MOCK_FIRMS.map((item) => [item.id, item])).values());
           setFirms(uniqueMocks);
         }
-      } catch (err) {
-        console.error('Failed to load firms:', err);
-        const uniqueMocks = Array.from(new Map(MOCK_FIRMS.map((item) => [item.id, item])).values());
-        setFirms(uniqueMocks);
       } finally {
         setLoading(false);
       }
     }
     loadFirms();
+
+    // 3. Listen to external changes from other tabs or file-system
+    const handleFirmsChanged = (e: CustomEvent) => {
+      if (e.detail && Array.isArray(e.detail)) {
+        setFirms(e.detail);
+      } else {
+        setFirms(getStoredFirms());
+      }
+    };
+    window.addEventListener('empirial_firms_changed' as any, handleFirmsChanged);
+    window.addEventListener('firms-changed' as any, handleFirmsChanged);
+    return () => {
+      window.removeEventListener('empirial_firms_changed' as any, handleFirmsChanged);
+      window.removeEventListener('firms-changed' as any, handleFirmsChanged);
+    };
   }, []);
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -358,15 +402,76 @@ export default function AdminFirmsPage() {
     setIsAdding(true);
   };
 
+  const handleGlobalSaveChanges = async () => {
+    setIsGlobalSaving(true);
+    setGlobalSaveFeedback(null);
+    try {
+      // 1. Persist to local store & trigger custom events
+      saveStoredFirms(firms);
+
+      // 2. Push all firms to Firestore in parallel
+      const syncPromises = firms.map((firm) => updateFirm(firm.id, firm));
+      await Promise.allSettled(syncPromises);
+
+      // 3. Cascade updates (coupon, affiliate link, discount, logo) to linked challenges
+      try {
+        const { getStoredChallenges, updateStoredChallenge } = await import('@/lib/utils/challenges-store');
+        const { updateChallenge } = await import('@/lib/firebase/services');
+        const allChallenges = getStoredChallenges();
+        for (const firm of firms) {
+          const linked = allChallenges.filter((c) => c.firm_id === firm.id || c.firm_slug === firm.slug);
+          for (const ch of linked) {
+            const updates: any = {};
+            if (firm.coupon_code_custom && ch.coupon_code !== firm.coupon_code_custom) {
+              updates.coupon_code = firm.coupon_code_custom;
+            }
+            if (firm.buy_url && ch.buy_url !== firm.buy_url) {
+              updates.buy_url = firm.buy_url;
+            }
+            if (firm.discount_pct !== undefined && ch.discount_pct !== firm.discount_pct) {
+              updates.discount_pct = firm.discount_pct;
+            }
+            if (firm.logo_url && ch.firm_logo !== firm.logo_url) {
+              updates.firm_logo = firm.logo_url;
+            }
+            if (Object.keys(updates).length > 0) {
+              updateStoredChallenge(ch.id, updates);
+              try { await updateChallenge(ch.id, updates); } catch {}
+            }
+          }
+        }
+      } catch (syncErr) {
+        console.warn('Challenge cascade sync warning:', syncErr);
+      }
+
+      setGlobalSaveFeedback({
+        type: 'success',
+        message: `✓ All ${firms.length} prop firms successfully saved & synced across database and challenges!`,
+      });
+      setTimeout(() => setGlobalSaveFeedback(null), 5000);
+    } catch (err: any) {
+      console.error('Failed to sync firms:', err);
+      setGlobalSaveFeedback({
+        type: 'error',
+        message: `Saved locally. Cloud sync warning: ${err.message || 'Offline'}`,
+      });
+    } finally {
+      setIsGlobalSaving(false);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to permanently remove this firm profile?')) return;
     const targetFirm = firms.find((f) => f.id === id);
+    deleteStoredFirm(id);
+    const nextFirms = firms.filter((f) => f.id !== id);
+    setFirms(nextFirms);
+    saveStoredFirms(nextFirms);
     try {
       await deleteFirm(id);
     } catch (err) {
       console.error('Failed to delete firm:', err);
     }
-    setFirms(firms.filter((f) => f.id !== id));
     logAdminAction({
       action: `Deleted Prop Firm: ${targetFirm?.name || id}`,
       module: 'firms',
@@ -375,6 +480,11 @@ export default function AdminFirmsPage() {
       previous_state: targetFirm || null,
       new_state: null,
     });
+    setGlobalSaveFeedback({
+      type: 'success',
+      message: `Removed ${targetFirm?.name || 'firm'} from directory.`,
+    });
+    setTimeout(() => setGlobalSaveFeedback(null), 3500);
   };
 
   const parseNum = (val: any, fallback: number): number => {
@@ -396,7 +506,7 @@ export default function AdminFirmsPage() {
       name: formData.name.trim(),
       slug,
       type: formData.type || 'prop_firm',
-      logo_url: formData.logo_url || '/logos/nys.png',
+      logo_url: formData.logo_url || `/logos/${slug}.svg`,
       rating: parseNum(formData.rating, 4.8),
       review_count: parseNum(formData.review_count, 125),
       max_allocation: formData.max_allocation || '$2,000,000',
@@ -420,7 +530,7 @@ export default function AdminFirmsPage() {
       total_payouts: formData.total_payouts || '$15,000,000+',
       avg_payout_time: formData.avg_payout_time || '8-24 Hours',
       models: formData.models || ['1-Step Challenge', '2-Step Evaluation', 'Instant Model'],
-      buy_url: formData.buy_url || 'https://discord.gg/ww4dkeeZdp',
+      buy_url: formData.buy_url || '',
       max_loss_pct: parseNum(formData.max_loss_pct, 10),
       daily_loss_pct: parseNum(formData.daily_loss_pct, 5),
       profit_target_pct: parseNum(formData.profit_target_pct, 8),
@@ -434,7 +544,7 @@ export default function AdminFirmsPage() {
       firm_rules_article_title: formData.firm_rules_article_title || '',
       firm_rules_article_url: formData.firm_rules_article_url || '',
       rule_articles: formData.rule_articles || [],
-      payout_cycle: formData.payout_cycle || 'Bi-Weekly / 14 Days',
+      payout_cycle: formData.payout_cycle || formData.payout_custom || 'Bi-Weekly / 14 Days',
       payout_split_pct: parseNum(formData.payout_split_pct, 90),
       leverage: formData.leverage || '1:100',
       firm_types: formData.firm_types && formData.firm_types.length > 0 ? formData.firm_types : ['Forex'],
@@ -444,12 +554,41 @@ export default function AdminFirmsPage() {
     };
 
     if (editingFirm) {
+      const updatedFirm: Firm = { ...editingFirm, ...firmPayload };
+      const nextFirms = firms.map((f) => (f.id === editingFirm.id ? updatedFirm : f));
+      setFirms(nextFirms);
+      updateStoredFirm(editingFirm.id, firmPayload);
+      saveStoredFirms(nextFirms);
+
       try {
         await updateFirm(editingFirm.id, firmPayload);
       } catch (err) {
         console.error('Failed to update firm:', err);
       }
-      setFirms(firms.map((f) => (f.id === editingFirm.id ? { ...f, ...firmPayload } : f)));
+
+      // Cascade updates to challenges
+      try {
+        const { getStoredChallenges, updateStoredChallenge } = await import('@/lib/utils/challenges-store');
+        const { updateChallenge } = await import('@/lib/firebase/services');
+        const allChallenges = getStoredChallenges();
+        const firmChallenges = allChallenges.filter(
+          (c) => c.firm_id === editingFirm.id || c.firm_slug === editingFirm.slug
+        );
+        for (const ch of firmChallenges) {
+          const chUpdates: any = {};
+          if (firmPayload.coupon_code_custom) chUpdates.coupon_code = firmPayload.coupon_code_custom;
+          if (firmPayload.buy_url) chUpdates.buy_url = firmPayload.buy_url;
+          if (firmPayload.discount_pct !== undefined) chUpdates.discount_pct = firmPayload.discount_pct;
+          if (firmPayload.logo_url) chUpdates.firm_logo = firmPayload.logo_url;
+          if (Object.keys(chUpdates).length > 0) {
+            updateStoredChallenge(ch.id, chUpdates);
+            try { await updateChallenge(ch.id, chUpdates); } catch {}
+          }
+        }
+      } catch (cascadeErr) {
+        console.warn('Cascade update error:', cascadeErr);
+      }
+
       logAdminAction({
         action: `Updated Prop Firm: ${firmPayload.name}`,
         module: 'firms',
@@ -458,22 +597,40 @@ export default function AdminFirmsPage() {
         previous_state: editingFirm,
         new_state: { id: editingFirm.id, ...firmPayload },
       });
+
+      setGlobalSaveFeedback({
+        type: 'success',
+        message: `✓ Prop Firm "${firmPayload.name}" specs updated and synchronized!`,
+      });
+      setTimeout(() => setGlobalSaveFeedback(null), 4000);
     } else {
-      let createdId = slug;
+      let createdId = slug || `firm-${Date.now()}`;
       try {
-        createdId = await createFirm(firmPayload);
+        const fsId = await createFirm(firmPayload);
+        if (fsId) createdId = fsId;
       } catch (err) {
         console.error('Failed to create firm:', err);
       }
-      setFirms([{ id: createdId, ...firmPayload }, ...firms]);
+      const newFirm: Firm = { id: createdId, ...firmPayload };
+      const nextFirms = [newFirm, ...firms.filter((f) => f.id !== createdId && f.slug !== newFirm.slug)];
+      setFirms(nextFirms);
+      addStoredFirm(newFirm);
+      saveStoredFirms(nextFirms);
+
       logAdminAction({
         action: `Created Prop Firm: ${firmPayload.name}`,
         module: 'firms',
         target_id: createdId,
         entity_name: firmPayload.name,
         previous_state: null,
-        new_state: { id: createdId, ...firmPayload },
+        new_state: newFirm,
       });
+
+      setGlobalSaveFeedback({
+        type: 'success',
+        message: `✓ New Prop Firm "${firmPayload.name}" successfully registered and synchronized!`,
+      });
+      setTimeout(() => setGlobalSaveFeedback(null), 4000);
     }
 
     setIsAdding(false);
@@ -515,11 +672,16 @@ export default function AdminFirmsPage() {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => alert('All firm changes are synced and saved to the database!')}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-semibold cursor-pointer shadow"
+            onClick={handleGlobalSaveChanges}
+            disabled={isGlobalSaving}
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-semibold cursor-pointer shadow disabled:opacity-50 transition-all"
           >
-            <Check className="w-4 h-4" />
-            <span>Save Changes</span>
+            {isGlobalSaving ? (
+              <div className="w-4 h-4 border-2 border-white dark:border-black border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Check className="w-4 h-4" />
+            )}
+            <span>{isGlobalSaving ? 'Saving & Syncing...' : 'Save Changes'}</span>
           </button>
           <Link
             href="/admin/file-system"
@@ -546,6 +708,29 @@ export default function AdminFirmsPage() {
           </button>
         </div>
       </div>
+
+      {/* Global Save Status / Feedback Banner */}
+      {globalSaveFeedback && (
+        <div
+          className={`p-3.5 rounded-2xl border text-xs font-medium flex items-center justify-between animate-in fade-in duration-200 ${
+            globalSaveFeedback.type === 'success'
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+              : 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <Check className="w-4 h-4" />
+            <span>{globalSaveFeedback.message}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setGlobalSaveFeedback(null)}
+            className="text-muted-foreground hover:text-foreground p-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Directory Filter Manager Panel */}
       {showFilterManager && (

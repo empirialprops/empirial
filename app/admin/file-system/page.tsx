@@ -28,11 +28,12 @@ import {
   SlidersHorizontal,
   DollarSign,
   X,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { Firm, Challenge } from '@/lib/types';
-import { getStoredFirms, updateStoredFirm } from '@/lib/utils/firms-store';
+import { getStoredFirms, updateStoredFirm, addStoredFirm, saveStoredFirms } from '@/lib/utils/firms-store';
 import { getStoredChallenges } from '@/lib/utils/challenges-store';
-import { getFirms, getChallenges, updateFirm } from '@/lib/firebase/services';
+import { getFirms, getChallenges, updateFirm, createFirm } from '@/lib/firebase/services';
 import {
   FirmImportPayload,
   FirmImportAccountTier,
@@ -148,6 +149,154 @@ export default function AdminFirmFileSystemPage() {
     }
   };
 
+  // Register New Firm Modal (Direct firm & logo creation in file system)
+  const [registerModalOpen, setRegisterModalOpen] = useState(false);
+  const [registerSaving, setRegisterSaving] = useState(false);
+  const [registerSuccess, setRegisterSuccess] = useState<string | null>(null);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+  const registerLogoInputRef = useRef<HTMLInputElement>(null);
+  const [registerData, setRegisterData] = useState<Partial<Firm> & { logo_shape?: string }>({
+    name: '',
+    slug: '',
+    logo_url: '',
+    logo_shape: 'rounded-md',
+    category: 'forex',
+    buy_url: '',
+    coupon_code_custom: 'EMPIRIAL',
+    discount_pct: 20,
+    discount_label_custom: '20% OFF',
+    trust_score: 95,
+    rating: 4.8,
+    review_count: 100,
+    max_allocation: '$2,000,000',
+    profit_split_custom: 'Up to 90%',
+    payout_custom: 'Bi-Weekly / 14 Days',
+    payout_cycle: 'Bi-Weekly / 14 Days',
+    avg_payout_time: '8-24 Hours',
+    total_payouts: '$15,000,000+',
+    leverage: '1:100',
+    platforms: 'MT5, cTrader',
+    headquarters: 'Dubai, UAE',
+    founded_year: 2024,
+    models: ['1-Step Challenge', '2-Step Evaluation'],
+    consistency_rule: 'No strict consistency rule',
+    min_trading_days: 0,
+    description: '',
+    is_verified: true,
+    is_featured: false,
+  });
+
+  const handleRegisterLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Logo file size exceeds 2MB limit.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setRegisterData((prev) => ({
+        ...prev,
+        logo_url: reader.result as string,
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRegisterFirmSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!registerData.name?.trim()) {
+      setRegisterError('Firm name is required');
+      return;
+    }
+    setRegisterSaving(true);
+    setRegisterError(null);
+    setRegisterSuccess(null);
+
+    try {
+      const slug = (registerData.slug || registerData.name)
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '');
+      const discPct =
+        registerData.discount_pct !== undefined && registerData.discount_pct !== null && !isNaN(Number(registerData.discount_pct))
+          ? Number(registerData.discount_pct)
+          : undefined;
+      const discLabel = registerData.discount_label_custom || (discPct ? `${discPct}% OFF` : '');
+
+      const newFirmPayload: Firm = {
+        id: slug,
+        name: registerData.name.trim(),
+        slug: slug,
+        type: 'prop_firm',
+        logo_url: registerData.logo_url || `/logos/${slug}.svg`,
+        rating: Number(registerData.rating) || 4.8,
+        review_count: Number(registerData.review_count) || 100,
+        max_allocation: registerData.max_allocation || '$2,000,000',
+        profit_split_custom: registerData.profit_split_custom || 'Up to 90%',
+        payout_custom: registerData.payout_custom || 'Bi-Weekly / 14 Days',
+        payout_cycle: registerData.payout_cycle || registerData.payout_custom || 'Bi-Weekly / 14 Days',
+        discount_pct: discPct,
+        discount_label_custom: discLabel,
+        coupon_code_custom: (registerData.coupon_code_custom || 'EMPIRIAL').toUpperCase(),
+        platforms: registerData.platforms || 'MT5, cTrader',
+        category: registerData.category || 'forex',
+        is_featured: !!registerData.is_featured,
+        is_verified: registerData.is_verified !== false,
+        is_popular: false,
+        trust_score: Number(registerData.trust_score) || 95,
+        founded_year: Number(registerData.founded_year) || 2024,
+        headquarters: registerData.headquarters || 'Dubai, UAE',
+        country: registerData.headquarters?.split(',')[1]?.trim() || 'UAE',
+        years_working: registerData.founded_year ? `Est. ${registerData.founded_year}` : 'Est. 2024',
+        total_payouts: registerData.total_payouts || '$15,000,000+',
+        avg_payout_time: registerData.avg_payout_time || '8-24 Hours',
+        models: registerData.models && registerData.models.length > 0 ? registerData.models : ['1-Step Challenge', '2-Step Evaluation'],
+        buy_url: registerData.buy_url || '',
+        consistency_rule: registerData.consistency_rule || 'No strict consistency rule',
+        min_trading_days: registerData.min_trading_days !== undefined ? Number(registerData.min_trading_days) : 0,
+        leverage: registerData.leverage || '1:100',
+        description: registerData.description || `${registerData.name} prop trading firm.`,
+      };
+
+      // 1. Add to local store
+      addStoredFirm(newFirmPayload);
+      const updatedFirms = getStoredFirms();
+      setFirms(updatedFirms);
+      setSelectedFirmId(newFirmPayload.id);
+
+      // 2. Sync to Firestore
+      try {
+        await updateFirm(newFirmPayload.id, newFirmPayload);
+      } catch (fsErr) {
+        console.warn('Firestore sync warning:', fsErr);
+      }
+
+      // 3. Emit change events
+      window.dispatchEvent(new CustomEvent('empirial_firms_changed', { detail: updatedFirms }));
+      window.dispatchEvent(new CustomEvent('firms-changed', { detail: updatedFirms }));
+
+      // 4. Pre-fill parsedPayload firm if payload exists
+      if (parsedPayload) {
+        setParsedPayload({
+          ...parsedPayload,
+          firm_name: newFirmPayload.name,
+          firm_slug: newFirmPayload.slug,
+        });
+      }
+
+      setRegisterSuccess(`✓ Firm "${newFirmPayload.name}" successfully registered and selected!`);
+      setTimeout(() => {
+        setRegisterModalOpen(false);
+        setRegisterSuccess(null);
+      }, 1400);
+    } catch (err: any) {
+      setRegisterError(err.message || 'Failed to register firm.');
+    } finally {
+      setRegisterSaving(false);
+    }
+  };
+
   // Load existing firms & challenges directly from real Firestore database
   useEffect(() => {
     const localF = getStoredFirms();
@@ -176,6 +325,20 @@ export default function AdminFirmFileSystemPage() {
     }
 
     fetchLiveDatabase();
+
+    const handleFirmsChanged = (e: CustomEvent) => {
+      if (e.detail && Array.isArray(e.detail)) {
+        setFirms(e.detail);
+      } else {
+        setFirms(getStoredFirms());
+      }
+    };
+    window.addEventListener('empirial_firms_changed' as any, handleFirmsChanged);
+    window.addEventListener('firms-changed' as any, handleFirmsChanged);
+    return () => {
+      window.removeEventListener('empirial_firms_changed' as any, handleFirmsChanged);
+      window.removeEventListener('firms-changed' as any, handleFirmsChanged);
+    };
   }, []);
 
   const selectedFirm = firms.find((f) => f.id === selectedFirmId) || firms[0];
@@ -580,47 +743,83 @@ export default function AdminFirmFileSystemPage() {
       const matchedFirm = firms.find(
         (f) =>
           (parsedPayload.firm_slug && f.slug.toLowerCase() === parsedPayload.firm_slug.toLowerCase()) ||
-          (parsedPayload.firm_name && f.name.toLowerCase() === parsedPayload.firm_name.toLowerCase())
+          (parsedPayload.firm_name && f.name.toLowerCase() === parsedPayload.firm_name.toLowerCase()) ||
+          (f.id.toLowerCase() === (parsedPayload.firm_slug || '').toLowerCase())
       );
 
-      const firmToUse: Firm = matchedFirm || selectedFirm || {
-        id: parsedPayload.firm_slug || 'orion-funded',
-        name: parsedPayload.firm_name || 'Orion Funded',
-        slug: parsedPayload.firm_slug || 'orion-funded',
-        logo_url: `/logos/${parsedPayload.firm_slug || 'orion-funded'}.svg`,
-        rating: parsedPayload.overview.rating || 4.5,
-        review_count: 0,
-        max_allocation: parsedPayload.overview.max_allocation || '$400,000',
-        profit_split_custom: parsedPayload.overview.profit_split_custom || '80%',
-        payout_custom: parsedPayload.overview.payout_custom || 'Bi-Weekly',
-        payout_cycle: parsedPayload.overview.payout_cycle || 'Bi-Weekly / 14 Days',
-        payout_split_pct: (parsedPayload.overview.payout_split_pct as string) || '80%',
-        leverage: parsedPayload.overview.leverage || '1:100',
-        platforms: parsedPayload.overview.platforms || 'MT5, Match-Trader',
-        category: parsedPayload.overview.category || 'forex',
-        buy_url: parsedPayload.overview.buy_url || 'https://www.orionfunded.com?coupon=EMPIRIAL',
-        coupon_code_custom: parsedPayload.overview.coupon_code_custom || 'EMPIRIAL',
-        discount_label_custom: parsedPayload.overview.discount_label_custom || (parsedPayload.overview.discount_pct ? `${parsedPayload.overview.discount_pct}% OFF` : ''),
-        discount_pct: parsedPayload.overview.discount_pct !== undefined ? Number(parsedPayload.overview.discount_pct) : undefined,
-        total_payouts: parsedPayload.overview.total_payouts || '$6,600,000+',
-        avg_payout_time: parsedPayload.overview.avg_payout_time || '< 5 Hours',
-        trust_score: parsedPayload.overview.trust_score || 94,
-        description: parsedPayload.overview.description || '',
-        consistency_rule: parsedPayload.rules.consistency_rule || '',
-        firm_rules_content: parsedPayload.rules.firm_rules_content || '',
-        rule_articles: parsedPayload.rules.rule_articles || [],
-        restricted_countries: parsedPayload.rules.restricted_countries || [],
-        models: parsedPayload.rules.models || [],
-      };
+      let firmToUse: Firm;
+      if (matchedFirm) {
+        firmToUse = matchedFirm;
+      } else if (
+        parsedPayload.firm_name &&
+        (!selectedFirm || (parsedPayload.firm_slug && selectedFirm.slug.toLowerCase() !== parsedPayload.firm_slug.toLowerCase()))
+      ) {
+        // Automatically create and register the new firm from the imported file
+        const derivedSlug = (parsedPayload.firm_slug || parsedPayload.firm_name)
+          .toLowerCase()
+          .replace(/\s+/g, '-')
+          .replace(/[^a-z0-9-]/g, '');
+        const discPct =
+          parsedPayload.overview.discount_pct !== undefined
+            ? Number(parsedPayload.overview.discount_pct)
+            : undefined;
+        const discLabel =
+          parsedPayload.overview.discount_label_custom || (discPct ? `${discPct}% OFF` : '');
+
+        firmToUse = {
+          id: derivedSlug,
+          name: parsedPayload.firm_name,
+          slug: derivedSlug,
+          type: 'prop_firm',
+          logo_url: (parsedPayload.overview as any)?.logo_url || `/logos/${derivedSlug}.svg`,
+          rating: parsedPayload.overview.rating || 4.8,
+          review_count: 50,
+          max_allocation: parsedPayload.overview.max_allocation || '$2,000,000',
+          profit_split_custom: parsedPayload.overview.profit_split_custom || 'Up to 90%',
+          payout_custom: parsedPayload.overview.payout_custom || 'Bi-Weekly / 14 Days',
+          payout_cycle: parsedPayload.overview.payout_cycle || 'Bi-Weekly / 14 Days',
+          payout_split_pct: (parsedPayload.overview.payout_split_pct as string) || '90%',
+          leverage: parsedPayload.overview.leverage || '1:100',
+          platforms: parsedPayload.overview.platforms || 'MT5, cTrader',
+          category: (parsedPayload.overview.category as any) || 'forex',
+          buy_url: parsedPayload.overview.buy_url || '',
+          coupon_code_custom: (parsedPayload.overview.coupon_code_custom || 'EMPIRIAL').toUpperCase(),
+          discount_label_custom: discLabel,
+          discount_pct: discPct,
+          total_payouts: parsedPayload.overview.total_payouts || '$15,000,000+',
+          avg_payout_time: parsedPayload.overview.avg_payout_time || '8-24 Hours',
+          trust_score: parsedPayload.overview.trust_score || 95,
+          founded_year: parsedPayload.overview.founded_year || 2024,
+          headquarters: parsedPayload.overview.headquarters || 'Dubai, UAE',
+          country: parsedPayload.overview.headquarters?.split(',')[1]?.trim() || 'UAE',
+          years_working: parsedPayload.overview.founded_year ? `Est. ${parsedPayload.overview.founded_year}` : 'Est. 2024',
+          description: parsedPayload.overview.description || `${parsedPayload.firm_name} prop firm.`,
+          consistency_rule: parsedPayload.rules.consistency_rule || 'No strict consistency rule',
+          firm_rules_content: parsedPayload.rules.firm_rules_content || '',
+          rule_articles: parsedPayload.rules.rule_articles || [],
+          restricted_countries: parsedPayload.rules.restricted_countries || [],
+          models: parsedPayload.rules.models || ['1-Step Challenge', '2-Step Evaluation'],
+          is_verified: true,
+          is_featured: false,
+          is_popular: false,
+        };
+      } else {
+        firmToUse = selectedFirm;
+      }
 
       const res = await commitFirmImport(firmToUse, parsedPayload, replaceExistingAccounts);
       setCommitSuccess(res.message);
       // Refresh local stores
-      setFirms(getStoredFirms());
+      const freshFirms = getStoredFirms();
+      setFirms(freshFirms);
       setChallenges(getStoredChallenges());
       if (firmToUse.id) {
         setSelectedFirmId(firmToUse.id);
       }
+
+      // Notify entire app of firm/challenge additions
+      window.dispatchEvent(new CustomEvent('empirial_firms_changed', { detail: freshFirms }));
+      window.dispatchEvent(new CustomEvent('firms-changed', { detail: freshFirms }));
     } catch (err: any) {
       console.error('Commit failed:', err);
       setParseError(err.message || 'Failed to commit firm import to database.');
@@ -679,6 +878,51 @@ export default function AdminFirmFileSystemPage() {
           <p className="text-xs text-muted-foreground">
             Select the existing firm from your website database to associate and synchronize.
           </p>
+
+          <div className="pt-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                setRegisterData({
+                  name: '',
+                  slug: '',
+                  logo_url: '',
+                  logo_shape: 'rounded-md',
+                  category: 'forex',
+                  buy_url: '',
+                  coupon_code_custom: 'EMPIRIAL',
+                  discount_pct: 20,
+                  discount_label_custom: '20% OFF',
+                  trust_score: 95,
+                  rating: 4.8,
+                  review_count: 100,
+                  max_allocation: '$2,000,000',
+                  profit_split_custom: 'Up to 90%',
+                  payout_custom: 'Bi-Weekly / 14 Days',
+                  payout_cycle: 'Bi-Weekly / 14 Days',
+                  avg_payout_time: '8-24 Hours',
+                  total_payouts: '$15,000,000+',
+                  leverage: '1:100',
+                  platforms: 'MT5, cTrader',
+                  headquarters: 'Dubai, UAE',
+                  founded_year: 2024,
+                  models: ['1-Step Challenge', '2-Step Evaluation'],
+                  consistency_rule: 'No strict consistency rule',
+                  min_trading_days: 0,
+                  description: '',
+                  is_verified: true,
+                  is_featured: false,
+                });
+                setRegisterError(null);
+                setRegisterSuccess(null);
+                setRegisterModalOpen(true);
+              }}
+              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-semibold cursor-pointer transition-all shadow-xs"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ Register New Firm Directly</span>
+            </button>
+          </div>
 
           <div className="relative">
             <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-muted-foreground" />
@@ -2141,6 +2385,371 @@ export default function AdminFirmFileSystemPage() {
               )}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Register New Firm Modal Drawer */}
+      {registerModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+          <form
+            onSubmit={handleRegisterFirmSubmit}
+            className="bg-white dark:bg-card border border-zinc-200 dark:border-border rounded-3xl p-6 sm:p-8 max-w-3xl w-full space-y-5 shadow-2xl my-8 max-h-[90vh] overflow-y-auto"
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-foreground border border-zinc-200 dark:border-zinc-700">
+                  <Building2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-foreground">Register New Prop Firm & Logo</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Add a new prop firm to your directory, configure its brand logo and specs, and link it directly to account tiers.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRegisterModalOpen(false)}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Error / Success Alerts */}
+            {registerError && (
+              <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{registerError}</span>
+              </div>
+            )}
+            {registerSuccess && (
+              <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-300 text-xs flex items-center gap-2">
+                <Check className="w-4 h-4 shrink-0" />
+                <span>{registerSuccess}</span>
+              </div>
+            )}
+
+            {/* Form Fields Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              {/* Firm Name */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Firm Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Dolvero Funding"
+                  value={registerData.name || ''}
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    const autoSlug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+                    setRegisterData((prev) => ({
+                      ...prev,
+                      name,
+                      slug: prev.slug === '' || prev.slug === autoSlug.slice(0, -1) ? autoSlug : prev.slug,
+                      logo_url: prev.logo_url === '' || prev.logo_url?.startsWith('/logos/') ? `/logos/${autoSlug}.svg` : prev.logo_url,
+                    }));
+                  }}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-hidden focus:border-foreground"
+                />
+              </div>
+
+              {/* URL Slug */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">URL Slug</label>
+                <input
+                  type="text"
+                  placeholder="e.g. dolvero"
+                  value={registerData.slug || ''}
+                  onChange={(e) => setRegisterData({ ...registerData, slug: e.target.value })}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-hidden focus:border-foreground font-mono"
+                />
+              </div>
+
+              {/* Logo URL & File Upload */}
+              <div className="space-y-2 md:col-span-2 p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <label className="font-semibold text-foreground flex items-center gap-1.5">
+                    <ImageIcon className="w-3.5 h-3.5" />
+                    <span>Firm Logo (URL or Direct Upload)</span>
+                  </label>
+                  <span className="text-[11px] text-muted-foreground">Authentic Brand Identity</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                  <div className="sm:col-span-8 flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="e.g. /logos/dolvero.svg or https://..."
+                      value={registerData.logo_url || ''}
+                      onChange={(e) => setRegisterData({ ...registerData, logo_url: e.target.value })}
+                      className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-hidden focus:border-foreground font-mono text-[11px]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => registerLogoInputRef.current?.click()}
+                      className="px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-foreground font-medium text-xs whitespace-nowrap cursor-pointer transition-colors"
+                    >
+                      Browse...
+                    </button>
+                    <input
+                      ref={registerLogoInputRef}
+                      type="file"
+                      accept="image/*,.svg"
+                      onChange={handleRegisterLogoUpload}
+                      className="hidden"
+                    />
+                  </div>
+
+                  {/* Logo Preview */}
+                  <div className="sm:col-span-4 flex items-center gap-2">
+                    <div className="w-10 h-10 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center p-1 overflow-hidden shrink-0">
+                      {registerData.logo_url ? (
+                        <img
+                          src={registerData.logo_url}
+                          alt="Logo Preview"
+                          className="w-full h-full object-contain"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <Building2 className="w-5 h-5 text-zinc-400" />
+                      )}
+                    </div>
+                    <span className="text-[11px] text-muted-foreground leading-tight">
+                      {registerData.logo_url ? 'Preview of Authentic Logo' : 'No logo selected'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Category */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Category</label>
+                <select
+                  value={registerData.category || 'forex'}
+                  onChange={(e) => setRegisterData({ ...registerData, category: e.target.value as any })}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-hidden focus:border-foreground"
+                >
+                  <option value="forex">Forex</option>
+                  <option value="futures">Futures</option>
+                  <option value="crypto">Crypto</option>
+                  <option value="instant-funding">Instant Funding</option>
+                  <option value="prediction-markets">Prediction Markets</option>
+                  <option value="all">All / Multi-Asset</option>
+                </select>
+              </div>
+
+              {/* Coupon Code */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Discount Coupon Code</label>
+                <input
+                  type="text"
+                  placeholder="EMPIRIAL"
+                  value={registerData.coupon_code_custom || ''}
+                  onChange={(e) => setRegisterData({ ...registerData, coupon_code_custom: e.target.value.toUpperCase() })}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-hidden focus:border-foreground font-mono font-bold"
+                />
+              </div>
+
+              {/* Discount % */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Discount Percentage (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  placeholder="40"
+                  value={registerData.discount_pct !== undefined ? registerData.discount_pct : ''}
+                  onChange={(e) => {
+                    const val = e.target.value === '' ? undefined : Number(e.target.value);
+                    setRegisterData({
+                      ...registerData,
+                      discount_pct: val,
+                      discount_label_custom: val ? `${val}% OFF` : '',
+                    });
+                  }}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-hidden focus:border-foreground font-mono"
+                />
+              </div>
+
+              {/* Discount Label */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Discount Label (Badge)</label>
+                <input
+                  type="text"
+                  placeholder="40% OFF"
+                  value={registerData.discount_label_custom || ''}
+                  onChange={(e) => setRegisterData({ ...registerData, discount_label_custom: e.target.value })}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-hidden focus:border-foreground"
+                />
+              </div>
+
+              {/* Affiliate Buy URL */}
+              <div className="space-y-1 md:col-span-2">
+                <label className="font-semibold text-foreground">Affiliate / Purchase Referral Link</label>
+                <input
+                  type="url"
+                  placeholder="https://app.dolvero.com/r?ref=EMPIRIAL"
+                  value={registerData.buy_url || ''}
+                  onChange={(e) => setRegisterData({ ...registerData, buy_url: e.target.value })}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-hidden focus:border-foreground font-mono text-xs"
+                />
+              </div>
+
+              {/* Payout Schedule / Cycle */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Payout Schedule</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Bi-Weekly / 14 Days"
+                  value={registerData.payout_custom || ''}
+                  onChange={(e) => setRegisterData({ ...registerData, payout_custom: e.target.value, payout_cycle: e.target.value })}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-hidden focus:border-foreground"
+                />
+              </div>
+
+              {/* Profit Split */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Profit Split</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Up to 90%"
+                  value={registerData.profit_split_custom || ''}
+                  onChange={(e) => setRegisterData({ ...registerData, profit_split_custom: e.target.value })}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-hidden focus:border-foreground"
+                />
+              </div>
+
+              {/* Max Allocation */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Max Allocation</label>
+                <input
+                  type="text"
+                  placeholder="e.g. $2,000,000"
+                  value={registerData.max_allocation || ''}
+                  onChange={(e) => setRegisterData({ ...registerData, max_allocation: e.target.value })}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-hidden focus:border-foreground font-mono"
+                />
+              </div>
+
+              {/* Leverage */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Leverage</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 1:100"
+                  value={registerData.leverage || ''}
+                  onChange={(e) => setRegisterData({ ...registerData, leverage: e.target.value })}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-hidden focus:border-foreground font-mono"
+                />
+              </div>
+
+              {/* Supported Platforms */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Trading Platforms</label>
+                <input
+                  type="text"
+                  placeholder="e.g. MT5, cTrader, Bybit"
+                  value={registerData.platforms || ''}
+                  onChange={(e) => setRegisterData({ ...registerData, platforms: e.target.value })}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-hidden focus:border-foreground"
+                />
+              </div>
+
+              {/* Trust Score */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Trust Score (1-100)</label>
+                <input
+                  type="number"
+                  min="50"
+                  max="100"
+                  placeholder="95"
+                  value={registerData.trust_score || ''}
+                  onChange={(e) => setRegisterData({ ...registerData, trust_score: Number(e.target.value) })}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-hidden focus:border-foreground font-mono"
+                />
+              </div>
+
+              {/* Headquarters */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Headquarters</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Dubai, UAE"
+                  value={registerData.headquarters || ''}
+                  onChange={(e) => setRegisterData({ ...registerData, headquarters: e.target.value })}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-hidden focus:border-foreground"
+                />
+              </div>
+
+              {/* Founded Year */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Founded Year</label>
+                <input
+                  type="number"
+                  placeholder="2024"
+                  value={registerData.founded_year || ''}
+                  onChange={(e) => setRegisterData({ ...registerData, founded_year: Number(e.target.value) })}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-hidden focus:border-foreground font-mono"
+                />
+              </div>
+
+              {/* Consistency Rule */}
+              <div className="space-y-1 md:col-span-2">
+                <label className="font-semibold text-foreground">Consistency Rule Policy</label>
+                <input
+                  type="text"
+                  placeholder="e.g. No strict consistency rule on standard accounts."
+                  value={registerData.consistency_rule || ''}
+                  onChange={(e) => setRegisterData({ ...registerData, consistency_rule: e.target.value })}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-hidden focus:border-foreground"
+                />
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1 md:col-span-2">
+                <label className="font-semibold text-foreground">Firm Description</label>
+                <textarea
+                  rows={2}
+                  placeholder="Institutional prop firm offering premier trading conditions..."
+                  value={registerData.description || ''}
+                  onChange={(e) => setRegisterData({ ...registerData, description: e.target.value })}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-foreground focus:outline-hidden focus:border-foreground"
+                />
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+              <button
+                type="button"
+                onClick={() => setRegisterModalOpen(false)}
+                className="px-5 py-2.5 rounded-xl border border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-card dark:text-foreground text-xs font-semibold cursor-pointer transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={registerSaving}
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-semibold cursor-pointer shadow-xs disabled:opacity-50 transition-all"
+              >
+                {registerSaving ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Registering Firm...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Register & Select Firm</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

@@ -43,6 +43,8 @@ import { getFirms, updateAdvertisement } from '@/lib/firebase/services';
 import { Firm } from '@/lib/types';
 import { HomepageSpotlightCard } from '@/components/ads/homepage-spotlight-card';
 import { SparkleToastAd } from '@/components/ads/sparkle-toast-ad';
+import { InFeedAdCard } from '@/components/ads/in-feed-ad-card';
+import { Smartphone, Monitor } from 'lucide-react';
 
 const GRAPHIC_ICON_OPTIONS: { id: AdGraphicIcon; label: string; icon: React.ComponentType<any> }[] = [
   { id: 'sparkles', label: 'Sparkles', icon: Sparkles },
@@ -57,7 +59,8 @@ const GRAPHIC_ICON_OPTIONS: { id: AdGraphicIcon; label: string; icon: React.Comp
 export default function AdminAdvertisementsPage() {
   const [firms, setFirms] = useState<Firm[]>([]);
   const [config, setConfig] = useState<AdvertisementConfig>(DEFAULT_AD_CONFIG);
-  const [activeTab, setActiveTab] = useState<'edit' | 'preview-card' | 'preview-toast'>('edit');
+  const [activeTab, setActiveTab] = useState<'preview-card' | 'preview-toast' | 'preview-infeed'>('preview-card');
+  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -539,8 +542,36 @@ export default function AdminAdvertisementsPage() {
                 </select>
               </div>
 
+              {/* Sparkle Particle Density */}
+              <div className="space-y-1.5">
+                <label className="text-muted-foreground font-semibold">Sparkle Density</label>
+                <select
+                  value={config.sparkleDensity || 'standard'}
+                  onChange={(e) => setConfig((p) => ({ ...p, sparkleDensity: e.target.value as any }))}
+                  className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground"
+                >
+                  <option value="minimal">Minimal (6 Stars)</option>
+                  <option value="standard">Standard (14 Stars)</option>
+                  <option value="vibrant">Vibrant / Full Burst</option>
+                </select>
+              </div>
+
+              {/* In-Feed Frequency */}
+              <div className="space-y-1.5">
+                <label className="text-muted-foreground font-semibold">In-Feed Grid Frequency</label>
+                <select
+                  value={config.inFeedFrequency || 6}
+                  onChange={(e) => setConfig((p) => ({ ...p, inFeedFrequency: Number(e.target.value) }))}
+                  className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground"
+                >
+                  <option value={4}>Every 4th Card</option>
+                  <option value={6}>Every 6th Card (Recommended)</option>
+                  <option value={8}>Every 8th Card</option>
+                </select>
+              </div>
+
               {/* Placement Checkboxes */}
-              <div className="space-y-2 pt-1">
+              <div className="sm:col-span-2 space-y-2 pt-1 border-t border-zinc-100 dark:border-zinc-800">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -549,7 +580,7 @@ export default function AdminAdvertisementsPage() {
                     className="rounded accent-black dark:accent-white"
                   />
                   <span className="font-semibold text-foreground">
-                    Show on Homepage (Verified Firms ↔ Plans)
+                    Show on Homepage (Between Verified Firms &amp; Plans)
                   </span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -560,7 +591,18 @@ export default function AdminAdvertisementsPage() {
                     className="rounded accent-black dark:accent-white"
                   />
                   <span className="font-semibold text-foreground">
-                    Show Floating Slide-in Toast
+                    Show Floating Slide-in Toast with Sparkle Burst
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={config.showInFeedCards}
+                    onChange={(e) => setConfig((p) => ({ ...p, showInFeedCards: e.target.checked }))}
+                    className="rounded accent-black dark:accent-white"
+                  />
+                  <span className="font-semibold text-foreground">
+                    Show In-Feed Native Cards in /challenges &amp; /firms
                   </span>
                 </label>
               </div>
@@ -571,78 +613,140 @@ export default function AdminAdvertisementsPage() {
         {/* Right Column: Live Interactive Previews (5 cols) */}
         <div className="lg:col-span-5 space-y-4 lg:sticky lg:top-6">
           <div className="bg-white dark:bg-card border border-zinc-200 dark:border-border rounded-2xl p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-3">
               <div className="flex items-center gap-2">
                 <Eye className="w-4 h-4 text-foreground" />
-                <h3 className="text-sm font-bold text-foreground">Live Interactive Previews</h3>
+                <h3 className="text-sm font-bold text-foreground">Live Previews</h3>
               </div>
-              <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl text-xs">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('preview-card')}
-                  className={`px-2.5 py-1 rounded-lg font-medium transition-colors ${
-                    activeTab === 'preview-card'
-                      ? 'bg-black text-white dark:bg-white dark:text-black shadow-xs font-semibold'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Card
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('preview-toast')}
-                  className={`px-2.5 py-1 rounded-lg font-medium transition-colors ${
-                    activeTab === 'preview-toast'
-                      ? 'bg-black text-white dark:bg-white dark:text-black shadow-xs font-semibold'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Toast
-                </button>
-              </div>
-            </div>
 
-            {/* Preview View: Homepage Spotlight Card */}
-            {activeTab !== 'preview-toast' && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Homepage In-Between Card Preview:</span>
-                  <span className="font-mono text-[11px]">Solid Dark Surface</span>
-                </div>
-                <div className="p-3 rounded-2xl bg-zinc-900/60 dark:bg-zinc-950 border border-zinc-800 overflow-hidden">
-                  <HomepageSpotlightCard forceConfig={config} />
-                </div>
-              </div>
-            )}
-
-            {/* Preview View: Corner Slide-in Toast with Test Replay */}
-            {activeTab === 'preview-toast' && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Slide-in Toast Interactive Preview:</span>
+              <div className="flex items-center gap-2">
+                {/* Device Mode Switcher */}
+                <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-[11px]">
                   <button
                     type="button"
-                    onClick={() => setToastReplayCount((c) => c + 1)}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-foreground font-semibold text-xs border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                    onClick={() => setPreviewDevice('desktop')}
+                    title="Desktop Preview"
+                    className={`p-1 rounded transition-colors ${
+                      previewDevice === 'desktop'
+                        ? 'bg-black text-white dark:bg-white dark:text-black shadow-xs font-semibold'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
                   >
-                    <RotateCcw className="w-3 h-3" />
-                    <span>Replay Animation</span>
+                    <Monitor className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewDevice('mobile')}
+                    title="Mobile Screen Preview"
+                    className={`p-1 rounded transition-colors ${
+                      previewDevice === 'mobile'
+                        ? 'bg-black text-white dark:bg-white dark:text-black shadow-xs font-semibold'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Smartphone className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
-                <div className="relative h-64 rounded-2xl bg-zinc-900/60 dark:bg-zinc-950 border border-zinc-800 flex items-center justify-center overflow-hidden p-4">
-                  {/* Embedded Toast Simulator */}
-                  <SparkleToastAd
-                    key={toastReplayCount}
-                    forcePreviewConfig={config}
-                    triggerPreview={true}
-                  />
+                {/* Tab Switcher */}
+                <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('preview-card')}
+                    className={`px-2 py-1 rounded-lg font-medium transition-colors ${
+                      activeTab === 'preview-card'
+                        ? 'bg-black text-white dark:bg-white dark:text-black shadow-xs font-semibold'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Card
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('preview-infeed')}
+                    className={`px-2 py-1 rounded-lg font-medium transition-colors ${
+                      activeTab === 'preview-infeed'
+                        ? 'bg-black text-white dark:bg-white dark:text-black shadow-xs font-semibold'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    In-Feed
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('preview-toast')}
+                    className={`px-2 py-1 rounded-lg font-medium transition-colors ${
+                      activeTab === 'preview-toast'
+                        ? 'bg-black text-white dark:bg-white dark:text-black shadow-xs font-semibold'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Toast
+                  </button>
                 </div>
-                <p className="text-[11px] text-muted-foreground text-center">
-                  Click 'Replay Animation' to test the spring entrance, perimeter sparkles, and countdown timer.
-                </p>
               </div>
-            )}
+            </div>
+
+            {/* Simulated Device Frame Container */}
+            <div className={`transition-all duration-300 ${previewDevice === 'mobile' ? 'max-w-[340px] mx-auto border-2 border-zinc-700/80 rounded-3xl p-2.5 bg-black shadow-xl' : ''}`}>
+              {/* Preview 1: Homepage In-Between Spotlight Card */}
+              {activeTab === 'preview-card' && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Homepage In-Between Card:</span>
+                    <span className="font-mono text-[10px] uppercase">{previewDevice}</span>
+                  </div>
+                  <div className="rounded-2xl bg-zinc-950 border border-zinc-800 overflow-hidden">
+                    <HomepageSpotlightCard forceConfig={config} />
+                  </div>
+                </div>
+              )}
+
+              {/* Preview 2: In-Feed Native Card (/challenges & /firms) */}
+              {activeTab === 'preview-infeed' && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>In-Feed Sponsored Grid Card:</span>
+                    <span className="font-mono text-[10px] uppercase">{previewDevice}</span>
+                  </div>
+                  <div className="rounded-2xl bg-zinc-950 border border-zinc-800 p-2 overflow-hidden">
+                    <InFeedAdCard forceConfig={config} />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground text-center pt-1">
+                    Appears naturally inside /challenges and /firms after every {config.inFeedFrequency || 6} items.
+                  </p>
+                </div>
+              )}
+
+              {/* Preview 3: Corner Slide-in Toast with Test Replay */}
+              {activeTab === 'preview-toast' && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Slide-in Toast Interactive:</span>
+                    <button
+                      type="button"
+                      onClick={() => setToastReplayCount((c) => c + 1)}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-foreground font-semibold text-xs border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      <span>Replay Animation</span>
+                    </button>
+                  </div>
+
+                  <div className="relative h-64 rounded-2xl bg-zinc-950 border border-zinc-800 flex items-center justify-center overflow-hidden p-4">
+                    {/* Embedded Toast Simulator */}
+                    <SparkleToastAd
+                      key={toastReplayCount}
+                      forcePreviewConfig={config}
+                      triggerPreview={true}
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground text-center">
+                    Click 'Replay Animation' to test the spring entrance, 14-star perimeter sparkles, and countdown timer.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

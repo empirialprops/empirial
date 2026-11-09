@@ -31,6 +31,7 @@ import { getStoredFirms } from '@/lib/utils/firms-store';
 import { getStoredChallenges } from '@/lib/utils/challenges-store';
 import { getStoredDeals } from '@/lib/utils/deals-store';
 import { calculateFirmMetrics } from '@/lib/utils/rating-calculator';
+import { InFeedAdCard } from '@/components/ads/in-feed-ad-card';
 import {
   Tooltip,
   TooltipContent,
@@ -655,7 +656,7 @@ export function FirmsClient() {
             <div className="space-y-3.5">
               <AnimatePresence mode="popLayout">
                 {processedFirms.length > 0 ? (
-                  processedFirms.map((firm) => {
+                  processedFirms.map((firm, idx) => {
                     const isHovered = hoveredFirmId === firm.id;
                     const isExpanded = expandedFirmId === firm.id;
                     const hasCopied = hasCopiedCodes[firm.id];
@@ -698,21 +699,24 @@ export function FirmsClient() {
                     })();
 
                     return (
-                      <motion.div
-                        layout="position"
-                        key={firm.id}
-                        initial={{ opacity: 0, y: 4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -2, transition: { duration: 0.15 } }}
-                        transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                        onMouseEnter={() => handleMouseEnterFirm(firm.id)}
-                        onMouseLeave={handleMouseLeaveFirm}
-                        className={`relative rounded-2xl transition-all duration-500 ease-in-out border ${
-                          isExpanded || isHovered
-                            ? 'border-black dark:border-white shadow-[0_0_20px_rgba(0,0,0,0.14)] dark:shadow-[0_0_25px_rgba(255,255,255,0.18)] bg-white/70 dark:bg-card backdrop-blur-md'
-                            : 'border-zinc-200 dark:border-border hover:border-black dark:hover:border-white hover:shadow-[0_0_18px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_0_22px_rgba(255,255,255,0.16)] bg-white/60 dark:bg-card backdrop-blur-md'
-                        }`}
-                      >
+                      <React.Fragment key={firm.id}>
+                        {idx > 0 && idx % 6 === 0 && (
+                          <InFeedAdCard variant="firm" />
+                        )}
+                        <motion.div
+                          layout="position"
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -2, transition: { duration: 0.15 } }}
+                          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                          onMouseEnter={() => handleMouseEnterFirm(firm.id)}
+                          onMouseLeave={handleMouseLeaveFirm}
+                          className={`relative rounded-2xl transition-all duration-500 ease-in-out border ${
+                            isExpanded || isHovered
+                              ? 'border-black dark:border-white shadow-[0_0_20px_rgba(0,0,0,0.14)] dark:shadow-[0_0_25px_rgba(255,255,255,0.18)] bg-white/70 dark:bg-card backdrop-blur-md'
+                              : 'border-zinc-200 dark:border-border hover:border-black dark:hover:border-white hover:shadow-[0_0_18px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_0_22px_rgba(255,255,255,0.16)] bg-white/60 dark:bg-card backdrop-blur-md'
+                          }`}
+                        >
                         {/* Main Card Content */}
                         <div className="p-4 sm:p-5 space-y-4">
                           {/* Top Header Row (Desktop View matching Image 1) */}
@@ -1079,7 +1083,8 @@ export function FirmsClient() {
                           )}
                         </AnimatePresence>
                       </motion.div>
-                    );
+                    </React.Fragment>
+                  );
                   })
                 ) : (
                   <motion.div

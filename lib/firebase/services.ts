@@ -265,10 +265,10 @@ export async function updateFirm(id: string, firm: Partial<Firm>): Promise<void>
   if (db) {
     try {
       const docRef = doc(db, 'firms', id);
-      await updateDoc(docRef, {
+      await setDoc(docRef, {
         ...firm,
         updated_at: new Date().toISOString()
-      });
+      }, { merge: true });
 
       // Cascade denormalized data updates to challenges, deals, and payouts
       if (firm.name || firm.logo_url || firm.slug) {

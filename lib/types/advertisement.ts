@@ -10,6 +10,8 @@ export interface AdvertisementConfig {
   // Display locations
   showSpotlightCard: boolean; // Homepage in-between section
   showSlideToast: boolean;     // Floating corner slide-in toast
+  showInFeedCards: boolean;    // In-feed native sponsored cards in /challenges & /firms
+  inFeedFrequency: number;     // e.g. 6 (show card every 6th item)
   
   // Identity & Imagery
   badge: string;              // e.g. "⚡ FLASH DEAL", "RULE UPDATE", "NEW FEATURE"
@@ -32,6 +34,7 @@ export interface AdvertisementConfig {
   
   // Animation & Behavior
   sparkleAnimation: boolean;  // ✦ Sparkle star burst around perimeter
+  sparkleDensity?: 'minimal' | 'standard' | 'vibrant'; // Sparkle star particle density (6, 12, or 18 stars)
   autoDismissSeconds: number; // 0 = permanent until closed; 3, 5, 8 etc.
   toastPosition: 'bottom-left' | 'bottom-right';
   
