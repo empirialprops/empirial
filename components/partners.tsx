@@ -96,7 +96,7 @@ export default function Partners() {
   };
 
   return (
-    <section className="max-w-6xl w-full mx-auto px-4 py-16 sm:py-20 gap-10 md:px-8 flex flex-col justify-center items-center text-center bg-transparent">
+    <section className="max-w-6xl w-full mx-auto px-4 pt-16 pb-8 sm:pt-20 sm:pb-10 gap-10 md:px-8 flex flex-col justify-center items-center text-center bg-transparent">
       <motion.div
         initial={{ y: 20, opacity: 0, filter: "blur(3px)" }}
         whileInView={{

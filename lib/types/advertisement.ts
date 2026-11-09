@@ -1,0 +1,40 @@
+export type AdvertisementTemplate = 'deal' | 'rule-update' | 'feature' | 'custom';
+
+export type AdGraphicIcon = 'sparkles' | 'shield' | 'flame' | 'gift' | 'bell' | 'trophy' | 'zap';
+
+export interface AdvertisementConfig {
+  id?: string;
+  enabled: boolean;
+  template: AdvertisementTemplate;
+  
+  // Display locations
+  showSpotlightCard: boolean; // Homepage in-between section
+  showSlideToast: boolean;     // Floating corner slide-in toast
+  
+  // Identity & Imagery
+  badge: string;              // e.g. "⚡ FLASH DEAL", "RULE UPDATE", "NEW FEATURE"
+  title: string;              // Main headline
+  subtitle: string;           // Supporting copy / description
+  firmId?: string;            // Associated firm ID (if any)
+  firmName?: string;          // Firm Name
+  logoUrl?: string;           // Firm logo URL or graphic image URL
+  graphicIcon?: AdGraphicIcon; // Pre-built SVG icon when no logo is used
+  customGraphicUrl?: string;  // Uploaded custom graphic / badge
+  
+  // Promotional Offer & Action
+  couponCode?: string;        // Optional coupon code for 1-click copy
+  discountTag?: string;       // e.g. "20% OFF", "ZERO RESTRICTIONS", "FREE PASS"
+  ctaText: string;            // Button text (e.g. "Claim Deal →", "Read Rules →")
+  ctaLink: string;            // Affiliate or internal target URL
+  secondaryCtaText?: string;  // Optional secondary button
+  secondaryCtaLink?: string;  // Optional secondary link
+  benefits: string[];         // Bullet points shown on the spotlight card
+  
+  // Animation & Behavior
+  sparkleAnimation: boolean;  // ✦ Sparkle star burst around perimeter
+  autoDismissSeconds: number; // 0 = permanent until closed; 3, 5, 8 etc.
+  toastPosition: 'bottom-left' | 'bottom-right';
+  
+  updatedAt: number;
+}
+

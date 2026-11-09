@@ -5,6 +5,7 @@ import Partners from "@/components/partners";
 import Stats from "@/components/stats";
 import Testimonials from "@/components/testimonials";
 import Pricing from "@/components/pricing";
+import { HomepageSpotlightCard } from "@/components/ads/homepage-spotlight-card";
 import Faq from "@/components/faq";
 import Footer from "@/components/footer";
 import { motion } from "framer-motion";
@@ -28,6 +29,7 @@ export function HomeClient() {
       <div className="relative z-10 w-full flex flex-col">
         <Hero />
         <Partners />
+        <HomepageSpotlightCard />
         <Pricing />
         <Stats />
         <Testimonials />

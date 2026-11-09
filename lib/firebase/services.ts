@@ -172,6 +172,37 @@ export function subscribeToOfferPoster(callback: (posterConfig: any) => void): (
   }
 }
 
+export function subscribeToAdvertisement(callback: (adConfig: any) => void): () => void {
+  if (!db) return () => {};
+  try {
+    const docRef = doc(db, 'siteSettings', 'main');
+    return onSnapshot(docRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data && 'advertisementConfig' in data) {
+          callback(data.advertisementConfig);
+        }
+      }
+    });
+  } catch (err) {
+    console.warn('Failed to subscribe to advertisement config:', err);
+    return () => {};
+  }
+}
+
+export async function updateAdvertisement(adConfig: any): Promise<void> {
+  if (!db) return;
+  const docRef = doc(db, 'siteSettings', 'main');
+  await setDoc(docRef, {
+    advertisementConfig: {
+      ...adConfig,
+      updatedAt: Date.now(),
+    },
+    updated_at: new Date().toISOString(),
+  }, { merge: true });
+}
+
+
 
 // ==========================================
 // PROP FIRMS

@@ -153,7 +153,7 @@ export default function Pricing() {
   return (
     <section
       id="pricing"
-      className="relative w-full overflow-hidden mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 md:px-8"
+      className="relative w-full overflow-hidden mx-auto max-w-7xl px-4 pt-8 pb-16 sm:px-6 sm:pt-12 sm:pb-24 md:px-8"
     >
       <motion.div
         initial={{ y: 20, opacity: 0 }}

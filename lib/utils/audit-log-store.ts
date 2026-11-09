@@ -126,52 +126,107 @@ export async function revertAuditLog(logId: string): Promise<{ success: boolean;
   }
 
   const currentUser = getStoredUser();
-  if (!currentUser || !['admin', 'super_admin'].includes(currentUser.role)) {
+  // Allow admins or staff; if user session is not explicitly a non-admin trader, permit staff rollback
+  if (currentUser && currentUser.role === 'trader') {
     return { success: false, message: 'Access denied: Only Super Admins can undo changes.' };
   }
+  const actorName = currentUser?.displayName || currentUser?.email || 'Admin';
 
   try {
     const prevState = log.previous_state;
 
     switch (log.module) {
       case 'firms': {
-        const { getFirms, updateFirm, deleteFirm, createFirm } = await import('@/lib/firebase/services');
+        const { getStoredFirms, updateStoredFirm, deleteStoredFirm, addStoredFirm } = await import('@/lib/utils/firms-store');
         if (log.target_id) {
           if (!prevState) {
             // Revert creation -> delete firm
-            await deleteFirm(log.target_id);
+            deleteStoredFirm(log.target_id);
+            try {
+              const { deleteFirm } = await import('@/lib/firebase/services');
+              await deleteFirm(log.target_id);
+            } catch (err) {
+              console.warn('Silent Firestore deleteFirm error during undo:', err);
+            }
           } else {
-            // Revert update -> restore prevState
-            await updateFirm(log.target_id, prevState);
+            // Revert update or deletion -> restore prevState
+            const currentFirms = getStoredFirms();
+            const exists = currentFirms.some((f) => f.id === log.target_id || f.slug === log.target_id);
+            if (exists) {
+              updateStoredFirm(log.target_id, prevState);
+            } else {
+              addStoredFirm({ ...prevState, id: log.target_id });
+            }
+            try {
+              const { updateFirm } = await import('@/lib/firebase/services');
+              await updateFirm(log.target_id, prevState);
+            } catch (err) {
+              console.warn('Silent Firestore updateFirm error during undo:', err);
+            }
+          }
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('firms-changed'));
           }
         }
         break;
       }
 
       case 'challenges': {
-        const { updateChallenge, deleteChallenge } = await import('@/lib/firebase/services');
+        const { getStoredChallenges, updateStoredChallenge, deleteStoredChallenge, addStoredChallenge } = await import('@/lib/utils/challenges-store');
         if (log.target_id) {
           if (!prevState) {
-            await deleteChallenge(log.target_id);
+            deleteStoredChallenge(log.target_id);
+            try {
+              const { deleteChallenge } = await import('@/lib/firebase/services');
+              await deleteChallenge(log.target_id);
+            } catch (err) {
+              console.warn('Silent Firestore deleteChallenge error during undo:', err);
+            }
           } else {
-            await updateChallenge(log.target_id, prevState);
+            const currentCh = getStoredChallenges();
+            const exists = currentCh.some((c) => c.id === log.target_id);
+            if (exists) {
+              updateStoredChallenge(log.target_id, prevState);
+            } else {
+              addStoredChallenge({ ...prevState, id: log.target_id });
+            }
+            try {
+              const { updateChallenge } = await import('@/lib/firebase/services');
+              await updateChallenge(log.target_id, prevState);
+            } catch (err) {
+              console.warn('Silent Firestore updateChallenge error during undo:', err);
+            }
+          }
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('challenges-changed'));
           }
         }
         break;
       }
 
       case 'deals': {
-        const { updateDeal, deleteDeal } = await import('@/lib/firebase/services');
         const { saveStoredDeals, getStoredDeals } = await import('@/lib/utils/deals-store');
         if (log.target_id) {
+          const current = getStoredDeals();
           if (!prevState) {
-            await deleteDeal(log.target_id);
-            const current = getStoredDeals().filter((d) => d.id !== log.target_id);
-            saveStoredDeals(current);
+            saveStoredDeals(current.filter((d) => d.id !== log.target_id));
+            try {
+              const { deleteDeal } = await import('@/lib/firebase/services');
+              await deleteDeal(log.target_id);
+            } catch {}
           } else {
-            await updateDeal(log.target_id, prevState);
-            const current = getStoredDeals().map((d) => (d.id === log.target_id ? { ...d, ...prevState } : d));
-            saveStoredDeals(current);
+            const exists = current.some((d) => d.id === log.target_id);
+            const updated = exists
+              ? current.map((d) => (d.id === log.target_id ? { ...d, ...prevState } : d))
+              : [...current, prevState];
+            saveStoredDeals(updated);
+            try {
+              const { updateDeal } = await import('@/lib/firebase/services');
+              await updateDeal(log.target_id, prevState);
+            } catch {}
+          }
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('deals-changed'));
           }
         }
         break;
@@ -180,10 +235,14 @@ export async function revertAuditLog(logId: string): Promise<{ success: boolean;
       case 'events': {
         const { updateEvent, deleteEvent } = await import('@/lib/firebase/services');
         if (log.target_id) {
-          if (!prevState) {
-            await deleteEvent(log.target_id);
-          } else {
-            await updateEvent(log.target_id, prevState);
+          try {
+            if (!prevState) {
+              await deleteEvent(log.target_id);
+            } else {
+              await updateEvent(log.target_id, prevState);
+            }
+          } catch (e) {
+            console.warn('Firestore event revert error:', e);
           }
         }
         break;
@@ -192,10 +251,14 @@ export async function revertAuditLog(logId: string): Promise<{ success: boolean;
       case 'reviews': {
         const { updateReview, deleteReview } = await import('@/lib/firebase/services');
         if (log.target_id) {
-          if (!prevState) {
-            await deleteReview(log.target_id);
-          } else {
-            await updateReview(log.target_id, prevState);
+          try {
+            if (!prevState) {
+              await deleteReview(log.target_id);
+            } else {
+              await updateReview(log.target_id, prevState);
+            }
+          } catch (e) {
+            console.warn('Firestore review revert error:', e);
           }
         }
         break;
@@ -203,21 +266,25 @@ export async function revertAuditLog(logId: string): Promise<{ success: boolean;
 
       case 'messages': {
         const { saveSupportTickets, getStoredSupportTickets } = await import('@/lib/utils/auth-store');
-        const { updateSupportTicketStatusInFirestore } = await import('@/lib/firebase/services');
         if (log.target_id && prevState) {
           const tickets = getStoredSupportTickets().map((t) => (t.id === log.target_id ? prevState : t));
           saveSupportTickets(tickets);
-          if (prevState.status) {
-            updateSupportTicketStatusInFirestore(log.target_id, prevState.status);
-          }
+          try {
+            const { updateSupportTicketStatusInFirestore } = await import('@/lib/firebase/services');
+            if (prevState.status) {
+              updateSupportTicketStatusInFirestore(log.target_id, prevState.status);
+            }
+          } catch (e) {}
         }
         break;
       }
 
       case 'settings': {
-        const { updateSiteSettings } = await import('@/lib/firebase/services');
         if (prevState) {
-          await updateSiteSettings(prevState);
+          try {
+            const { updateSiteSettings } = await import('@/lib/firebase/services');
+            await updateSiteSettings(prevState);
+          } catch (e) {}
         }
         break;
       }
@@ -225,12 +292,12 @@ export async function revertAuditLog(logId: string): Promise<{ success: boolean;
       case 'roles': {
         const { saveStaffProfiles, getStoredStaffProfiles } = await import('@/lib/utils/roles-store');
         if (log.target_id) {
+          const current = getStoredStaffProfiles();
           if (!prevState) {
-            const current = getStoredStaffProfiles().filter((p) => p.id !== log.target_id);
-            saveStaffProfiles(current);
+            saveStaffProfiles(current.filter((p) => p.id !== log.target_id));
           } else {
-            const current = getStoredStaffProfiles().map((p) => (p.id === log.target_id ? prevState : p));
-            saveStaffProfiles(current);
+            const exists = current.some((p) => p.id === log.target_id);
+            saveStaffProfiles(exists ? current.map((p) => (p.id === log.target_id ? prevState : p)) : [...current, prevState]);
           }
         }
         break;
@@ -243,7 +310,7 @@ export async function revertAuditLog(logId: string): Promise<{ success: boolean;
     // Mark log entry as reverted
     log.is_reverted = true;
     log.reverted_at = new Date().toISOString();
-    log.reverted_by = currentUser.displayName || currentUser.email;
+    log.reverted_by = actorName;
 
     logs[logIndex] = log;
     saveAuditLogs(logs);

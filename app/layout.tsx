@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import NavBar from '@/components/navbar';
 import { OfferPosterModal } from '@/components/offer-poster-modal';
 import { SupportBot } from '@/components/support-bot/support-bot';
+import { SparkleToastAd } from '@/components/ads/sparkle-toast-ad';
 import { ReferralTracker } from '@/components/referral-tracker';
 import { BrandingSync } from '@/components/branding-sync';
 import { TelemetryTracker } from '@/components/analytics/telemetry-tracker';
@@ -121,6 +122,9 @@ export default function RootLayout({
 
           {/* 24/7 AI Support Assistant */}
           <SupportBot />
+
+          {/* Floating Promotional Slide Toast with Sparkle Burst */}
+          <SparkleToastAd />
 
           {/* Main Content Area */}
           <main className="flex-1 w-full bg-background">

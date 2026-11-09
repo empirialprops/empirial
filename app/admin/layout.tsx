@@ -30,6 +30,7 @@ import {
   TrendingUp,
   FileText,
   FolderUp,
+  Megaphone,
 } from 'lucide-react';
 
 interface AdminNavItem {
@@ -154,6 +155,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Trading Platforms', href: '/admin/platforms', icon: Monitor, badge: 'New', roles: ['admin', 'super_admin', 'data_entry'], permission: 'manage_platforms' },
     { name: 'Evaluation Challenges', href: '/admin/challenges', icon: Trophy, badge: 'Portal', roles: ['admin', 'super_admin', 'data_entry'], permission: 'manage_challenges' },
     { name: 'Discount Promo Deals', href: '/admin/deals', icon: Tag, roles: ['admin', 'super_admin', 'data_entry'], permission: 'manage_deals' },
+    { name: 'Advertisements & Ads', href: '/admin/advertisements', icon: Megaphone, badge: 'Ads', roles: ['admin', 'super_admin', 'data_entry'], permission: 'manage_deals' },
     { name: 'Tournaments & Events', href: '/admin/events', icon: Calendar, roles: ['admin', 'super_admin', 'data_entry'], permission: 'manage_events' },
     { name: 'Spreads & Commission', href: '/admin/spreads', icon: Activity, roles: ['admin', 'super_admin', 'data_entry'], permission: 'manage_spreads' },
     { name: 'Market Ticker Feed', href: '/admin/market-ticker', icon: TrendingUp, roles: ['admin', 'super_admin', 'data_entry'] },
