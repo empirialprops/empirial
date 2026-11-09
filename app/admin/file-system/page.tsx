@@ -30,9 +30,9 @@ import {
   X,
 } from 'lucide-react';
 import { Firm, Challenge } from '@/lib/types';
-import { getStoredFirms } from '@/lib/utils/firms-store';
+import { getStoredFirms, updateStoredFirm } from '@/lib/utils/firms-store';
 import { getStoredChallenges } from '@/lib/utils/challenges-store';
-import { getFirms, getChallenges } from '@/lib/firebase/services';
+import { getFirms, getChallenges, updateFirm } from '@/lib/firebase/services';
 import {
   FirmImportPayload,
   FirmImportAccountTier,
@@ -71,6 +71,82 @@ export default function AdminFirmFileSystemPage() {
 
   // All Details Modal for Account Tier
   const [detailModalTierIndex, setDetailModalTierIndex] = useState<number | null>(null);
+
+  // Quick Edit Existing Firm (direct inline edit without file upload)
+  const [quickEditOpen, setQuickEditOpen] = useState(false);
+  const [quickEditSaving, setQuickEditSaving] = useState(false);
+  const [quickEditSuccess, setQuickEditSuccess] = useState<string | null>(null);
+  const [quickEditError, setQuickEditError] = useState<string | null>(null);
+  const [quickEditFields, setQuickEditFields] = useState<Partial<Firm>>({});
+
+  // Sync quickEditFields whenever selected firm changes
+  useEffect(() => {
+    if (selectedFirm) {
+      setQuickEditFields({
+        buy_url: selectedFirm.buy_url || '',
+        coupon_code_custom: selectedFirm.coupon_code_custom || '',
+        discount_pct: selectedFirm.discount_pct,
+        discount_label_custom: selectedFirm.discount_label_custom || '',
+        payout_custom: selectedFirm.payout_custom || '',
+        payout_cycle: selectedFirm.payout_cycle || '',
+        leverage: selectedFirm.leverage || '',
+        platforms: selectedFirm.platforms || '',
+        trust_score: selectedFirm.trust_score,
+        description: selectedFirm.description || '',
+        headquarters: selectedFirm.headquarters || '',
+        founded_year: selectedFirm.founded_year,
+        max_allocation: selectedFirm.max_allocation || '',
+        profit_split_custom: selectedFirm.profit_split_custom || '',
+        avg_payout_time: selectedFirm.avg_payout_time || '',
+        total_payouts: selectedFirm.total_payouts || '',
+        category: selectedFirm.category,
+      });
+      setQuickEditSuccess(null);
+      setQuickEditError(null);
+    }
+  }, [selectedFirmId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleQuickEditSave = async () => {
+    if (!selectedFirm) return;
+    setQuickEditSaving(true);
+    setQuickEditSuccess(null);
+    setQuickEditError(null);
+    try {
+      const updates: Partial<Firm> = { ...quickEditFields };
+      // Auto-derive discount label if not set
+      if (updates.discount_pct && !updates.discount_label_custom) {
+        updates.discount_label_custom = `${updates.discount_pct}% OFF`;
+      }
+      // Update local store
+      updateStoredFirm(selectedFirm.id, updates);
+      // Sync to Firestore
+      await updateFirm(selectedFirm.id, updates);
+      // Sync challenges' coupon + buy_url for this firm
+      const { getStoredChallenges, updateStoredChallenge } = await import('@/lib/utils/challenges-store');
+      const { updateChallenge } = await import('@/lib/firebase/services');
+      const allChallenges = getStoredChallenges();
+      const firmChallenges = allChallenges.filter(
+        (c) => c.firm_id === selectedFirm.id || c.firm_slug === selectedFirm.slug
+      );
+      for (const ch of firmChallenges) {
+        const chUpdates: any = {};
+        if (updates.coupon_code_custom) chUpdates.coupon_code = updates.coupon_code_custom;
+        if (updates.buy_url) chUpdates.buy_url = updates.buy_url;
+        if (updates.discount_pct !== undefined) chUpdates.discount_pct = updates.discount_pct;
+        if (Object.keys(chUpdates).length > 0) {
+          updateStoredChallenge(ch.id, chUpdates);
+          try { await updateChallenge(ch.id, chUpdates); } catch {}
+        }
+      }
+      // Refresh firms list
+      setFirms(getStoredFirms());
+      setQuickEditSuccess(`✓ ${selectedFirm.name} updated — ${firmChallenges.length} challenge(s) synchronized.`);
+    } catch (err: any) {
+      setQuickEditError(err.message || 'Save failed. Please try again.');
+    } finally {
+      setQuickEditSaving(false);
+    }
+  };
 
   // Load existing firms & challenges directly from real Firestore database
   useEffect(() => {
@@ -755,6 +831,281 @@ export default function AdminFirmFileSystemPage() {
             <span>Files support all platform rules, payout schedules, and account tiers.</span>
           </div>
         </div>
+      </div>
+
+      {/* Quick Edit Existing Firm — Direct Inline Editor (no file upload required) */}
+      <div className="bg-white dark:bg-card border border-zinc-200 dark:border-border rounded-2xl shadow-xs overflow-hidden">
+        {/* Collapsible Header */}
+        <button
+          type="button"
+          onClick={() => { setQuickEditOpen((o) => !o); setQuickEditSuccess(null); setQuickEditError(null); }}
+          className="w-full flex items-center justify-between px-6 py-4 hover:bg-zinc-50 dark:hover:bg-zinc-900/40 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center border border-zinc-200 dark:border-zinc-700">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-foreground" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-bold text-foreground">Quick Edit Firm Profile</p>
+              <p className="text-xs text-muted-foreground">
+                Edit discount, coupon, affiliate link &amp; more for{' '}
+                <strong className="text-foreground">{selectedFirm?.name}</strong> — syncs to all challenges instantly.
+              </p>
+            </div>
+          </div>
+          <div className={`transition-transform duration-200 ${quickEditOpen ? 'rotate-180' : ''}`}>
+            <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </button>
+
+        {/* Panel Body */}
+        {quickEditOpen && selectedFirm && (
+          <div className="border-t border-zinc-100 dark:border-zinc-800 px-6 py-5 space-y-5">
+            {/* Section: Affiliate & Discount */}
+            <div>
+              <p className="text-[11px] font-bold font-mono uppercase tracking-widest text-muted-foreground mb-3">
+                Affiliate &amp; Discount
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs">
+                <div className="sm:col-span-2 md:col-span-3 space-y-1.5">
+                  <label className="text-muted-foreground font-semibold">Custom Affiliate / Buy URL</label>
+                  <input
+                    type="url"
+                    value={quickEditFields.buy_url as string || ''}
+                    onChange={(e) => setQuickEditFields((p) => ({ ...p, buy_url: e.target.value }))}
+                    placeholder="https://firm.com?ref=EMPIRIAL"
+                    className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground font-mono text-xs"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-muted-foreground font-semibold">Coupon Code</label>
+                  <input
+                    type="text"
+                    value={quickEditFields.coupon_code_custom as string || ''}
+                    onChange={(e) => setQuickEditFields((p) => ({ ...p, coupon_code_custom: e.target.value.toUpperCase() }))}
+                    placeholder="EMPIRIAL"
+                    className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground font-mono uppercase"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-muted-foreground font-semibold">Discount %</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={quickEditFields.discount_pct ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value === '' ? undefined : Number(e.target.value);
+                      setQuickEditFields((p) => ({
+                        ...p,
+                        discount_pct: v,
+                        discount_label_custom: v ? `${v}% OFF` : p.discount_label_custom,
+                      }));
+                    }}
+                    placeholder="15"
+                    className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground font-mono"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-muted-foreground font-semibold">Discount Label</label>
+                  <input
+                    type="text"
+                    value={quickEditFields.discount_label_custom as string || ''}
+                    onChange={(e) => setQuickEditFields((p) => ({ ...p, discount_label_custom: e.target.value }))}
+                    placeholder="15% OFF"
+                    className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Section: Payout & Trading */}
+            <div>
+              <p className="text-[11px] font-bold font-mono uppercase tracking-widest text-muted-foreground mb-3">
+                Payout &amp; Trading Info
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs">
+                <div className="space-y-1.5">
+                  <label className="text-muted-foreground font-semibold">Payout Schedule Text</label>
+                  <input
+                    type="text"
+                    value={quickEditFields.payout_custom as string || ''}
+                    onChange={(e) => setQuickEditFields((p) => ({ ...p, payout_custom: e.target.value }))}
+                    placeholder="Bi-Weekly"
+                    className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-muted-foreground font-semibold">Payout Cycle</label>
+                  <input
+                    type="text"
+                    value={quickEditFields.payout_cycle as string || ''}
+                    onChange={(e) => setQuickEditFields((p) => ({ ...p, payout_cycle: e.target.value }))}
+                    placeholder="Bi-Weekly / 14 Days"
+                    className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-muted-foreground font-semibold">Leverage</label>
+                  <input
+                    type="text"
+                    value={quickEditFields.leverage as string || ''}
+                    onChange={(e) => setQuickEditFields((p) => ({ ...p, leverage: e.target.value }))}
+                    placeholder="1:100"
+                    className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground font-mono"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-muted-foreground font-semibold">Platforms</label>
+                  <input
+                    type="text"
+                    value={quickEditFields.platforms as string || ''}
+                    onChange={(e) => setQuickEditFields((p) => ({ ...p, platforms: e.target.value }))}
+                    placeholder="MT5, Match-Trader"
+                    className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-muted-foreground font-semibold">Average Payout Time</label>
+                  <input
+                    type="text"
+                    value={quickEditFields.avg_payout_time as string || ''}
+                    onChange={(e) => setQuickEditFields((p) => ({ ...p, avg_payout_time: e.target.value }))}
+                    placeholder="&lt; 5 Hours"
+                    className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-muted-foreground font-semibold">Total Payouts</label>
+                  <input
+                    type="text"
+                    value={quickEditFields.total_payouts as string || ''}
+                    onChange={(e) => setQuickEditFields((p) => ({ ...p, total_payouts: e.target.value }))}
+                    placeholder="$6,600,000+"
+                    className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Section: Firm Details */}
+            <div>
+              <p className="text-[11px] font-bold font-mono uppercase tracking-widest text-muted-foreground mb-3">
+                Firm Details
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                <div className="space-y-1.5">
+                  <label className="text-muted-foreground font-semibold">Headquarters</label>
+                  <input
+                    type="text"
+                    value={quickEditFields.headquarters as string || ''}
+                    onChange={(e) => setQuickEditFields((p) => ({ ...p, headquarters: e.target.value }))}
+                    placeholder="Dubai, UAE"
+                    className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-muted-foreground font-semibold">Founded Year</label>
+                  <input
+                    type="number"
+                    value={quickEditFields.founded_year ?? ''}
+                    onChange={(e) => setQuickEditFields((p) => ({ ...p, founded_year: Number(e.target.value) }))}
+                    placeholder="2022"
+                    className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground font-mono"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-muted-foreground font-semibold">Max Allocation</label>
+                  <input
+                    type="text"
+                    value={quickEditFields.max_allocation as string || ''}
+                    onChange={(e) => setQuickEditFields((p) => ({ ...p, max_allocation: e.target.value }))}
+                    placeholder="$400,000"
+                    className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground font-mono"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-muted-foreground font-semibold">Trust Score (0–100)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={quickEditFields.trust_score ?? ''}
+                    onChange={(e) => setQuickEditFields((p) => ({ ...p, trust_score: Number(e.target.value) }))}
+                    placeholder="95"
+                    className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground font-mono"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-muted-foreground font-semibold">Profit Split Custom</label>
+                  <input
+                    type="text"
+                    value={quickEditFields.profit_split_custom as string || ''}
+                    onChange={(e) => setQuickEditFields((p) => ({ ...p, profit_split_custom: e.target.value }))}
+                    placeholder="Up to 90%"
+                    className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-muted-foreground font-semibold">Category</label>
+                  <select
+                    value={quickEditFields.category as string || 'forex'}
+                    onChange={(e) => setQuickEditFields((p) => ({ ...p, category: e.target.value as any }))}
+                    className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground"
+                  >
+                    <option value="forex">Forex</option>
+                    <option value="futures">Futures</option>
+                    <option value="crypto">Crypto</option>
+                    <option value="instant-funding">Instant Funding</option>
+                    <option value="all">All</option>
+                  </select>
+                </div>
+                <div className="sm:col-span-2 space-y-1.5">
+                  <label className="text-muted-foreground font-semibold">Firm Description</label>
+                  <textarea
+                    rows={3}
+                    value={quickEditFields.description as string || ''}
+                    onChange={(e) => setQuickEditFields((p) => ({ ...p, description: e.target.value }))}
+                    placeholder="Short description shown on the firm's profile page..."
+                    className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground resize-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Success / Error feedback */}
+            {quickEditSuccess && (
+              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-300 text-xs flex items-center gap-2 font-medium">
+                <Check className="w-4 h-4 shrink-0" />
+                <span>{quickEditSuccess}</span>
+              </div>
+            )}
+            {quickEditError && (
+              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{quickEditError}</span>
+              </div>
+            )}
+
+            {/* Save Button */}
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                onClick={handleQuickEditSave}
+                disabled={quickEditSaving}
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-semibold transition-colors disabled:opacity-50 shadow-xs"
+              >
+                {quickEditSaving ? (
+                  <><RefreshCw className="w-4 h-4 animate-spin" /><span>Saving &amp; Syncing...</span></>
+                ) : (
+                  <><Check className="w-4 h-4" /><span>Save &amp; Sync to All Challenges</span></>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* File Upload / Paste Box */}
@@ -1641,6 +1992,90 @@ export default function AdminFirmFileSystemPage() {
                   value={parsedPayload.overview.discount_label_custom || ''}
                   onChange={(e) => handleOverviewChange('discount_label_custom', e.target.value)}
                   className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground"
+                />
+              </div>
+
+              {/* ── Affiliate & More ── */}
+              <div className="sm:col-span-2 md:col-span-3 space-y-1.5">
+                <label className="text-muted-foreground font-semibold">Custom Affiliate / Buy URL</label>
+                <input
+                  type="url"
+                  value={parsedPayload.overview.buy_url || ''}
+                  onChange={(e) => handleOverviewChange('buy_url', e.target.value)}
+                  placeholder="https://firm.com?ref=EMPIRIAL"
+                  className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground font-mono"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-muted-foreground font-semibold">Payout Schedule Text</label>
+                <input
+                  type="text"
+                  value={parsedPayload.overview.payout_custom || ''}
+                  onChange={(e) => handleOverviewChange('payout_custom', e.target.value)}
+                  placeholder="Bi-Weekly"
+                  className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-muted-foreground font-semibold">Payout Cycle</label>
+                <input
+                  type="text"
+                  value={parsedPayload.overview.payout_cycle || ''}
+                  onChange={(e) => handleOverviewChange('payout_cycle', e.target.value)}
+                  placeholder="Bi-Weekly / 14 Days"
+                  className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-muted-foreground font-semibold">Leverage</label>
+                <input
+                  type="text"
+                  value={parsedPayload.overview.leverage || ''}
+                  onChange={(e) => handleOverviewChange('leverage', e.target.value)}
+                  placeholder="1:100"
+                  className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground font-mono"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-muted-foreground font-semibold">Trust Score (0–100)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={parsedPayload.overview.trust_score ?? ''}
+                  onChange={(e) => handleOverviewChange('trust_score', e.target.value === '' ? undefined : Number(e.target.value))}
+                  placeholder="95"
+                  className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground font-mono"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-muted-foreground font-semibold">Category</label>
+                <select
+                  value={parsedPayload.overview.category || 'forex'}
+                  onChange={(e) => handleOverviewChange('category', e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground"
+                >
+                  <option value="forex">Forex</option>
+                  <option value="futures">Futures</option>
+                  <option value="crypto">Crypto</option>
+                  <option value="instant-funding">Instant Funding</option>
+                  <option value="all">All</option>
+                </select>
+              </div>
+
+              <div className="sm:col-span-2 md:col-span-3 space-y-1.5">
+                <label className="text-muted-foreground font-semibold">Firm Description</label>
+                <textarea
+                  rows={3}
+                  value={parsedPayload.overview.description || ''}
+                  onChange={(e) => handleOverviewChange('description', e.target.value)}
+                  placeholder="Short description shown on the firm's profile page..."
+                  className="w-full p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground resize-none"
                 />
               </div>
             </div>
