@@ -31,9 +31,9 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import { Firm, Challenge } from '@/lib/types';
-import { getStoredFirms, updateStoredFirm, addStoredFirm, saveStoredFirms } from '@/lib/utils/firms-store';
+import { getStoredFirms, updateStoredFirm, addStoredFirm, saveStoredFirms, deleteStoredFirm, getDeletedFirmIds } from '@/lib/utils/firms-store';
 import { getStoredChallenges } from '@/lib/utils/challenges-store';
-import { getFirms, getChallenges, updateFirm, createFirm } from '@/lib/firebase/services';
+import { getFirms, getChallenges, updateFirm, createFirm, deleteFirm } from '@/lib/firebase/services';
 import {
   FirmImportPayload,
   FirmImportAccountTier,
@@ -118,30 +118,43 @@ export default function AdminFirmFileSystemPage() {
       if (updates.discount_pct && !updates.discount_label_custom) {
         updates.discount_label_custom = `${updates.discount_pct}% OFF`;
       }
-      // Update local store
+
+      // 1. Instantly update local firm store
       updateStoredFirm(selectedFirm.id, updates);
-      // Sync to Firestore
-      await updateFirm(selectedFirm.id, updates);
-      // Sync challenges' coupon + buy_url for this firm
-      const { getStoredChallenges, updateStoredChallenge } = await import('@/lib/utils/challenges-store');
-      const { updateChallenge } = await import('@/lib/firebase/services');
+
+      // 2. Cascade changes to all challenges of this firm locally in one pass
+      const { getStoredChallenges, saveStoredChallenges } = await import('@/lib/utils/challenges-store');
       const allChallenges = getStoredChallenges();
-      const firmChallenges = allChallenges.filter(
-        (c) => c.firm_id === selectedFirm.id || c.firm_slug === selectedFirm.slug
-      );
-      for (const ch of firmChallenges) {
-        const chUpdates: any = {};
-        if (updates.coupon_code_custom) chUpdates.coupon_code = updates.coupon_code_custom;
-        if (updates.buy_url) chUpdates.buy_url = updates.buy_url;
-        if (updates.discount_pct !== undefined) chUpdates.discount_pct = updates.discount_pct;
-        if (Object.keys(chUpdates).length > 0) {
-          updateStoredChallenge(ch.id, chUpdates);
-          try { await updateChallenge(ch.id, chUpdates); } catch {}
+      let matchedCount = 0;
+      const updatedChallenges = allChallenges.map((ch) => {
+        if (ch.firm_id === selectedFirm.id || ch.firm_slug === selectedFirm.slug) {
+          matchedCount++;
+          const discPct = updates.discount_pct !== undefined ? updates.discount_pct : ch.discount_pct;
+          const discPrice =
+            ch.price > 0 && discPct !== undefined && discPct > 0
+              ? Math.round(ch.price * (1 - discPct / 100))
+              : ch.discounted_price;
+          return {
+            ...ch,
+            coupon_code: updates.coupon_code_custom || ch.coupon_code,
+            buy_url: updates.buy_url || ch.buy_url,
+            discount_pct: discPct,
+            discounted_price: discPrice,
+            firm_logo: updates.logo_url || ch.firm_logo,
+          };
         }
-      }
-      // Refresh firms list
-      setFirms(getStoredFirms());
-      setQuickEditSuccess(`✓ ${selectedFirm.name} updated — ${firmChallenges.length} challenge(s) synchronized.`);
+        return ch;
+      });
+      saveStoredChallenges(updatedChallenges);
+      setChallenges(updatedChallenges);
+
+      // 3. Refresh firms list and notify UI immediately
+      const freshFirms = getStoredFirms();
+      setFirms(freshFirms);
+      setQuickEditSuccess(`✓ ${selectedFirm.name} updated — ${matchedCount} challenge(s) synchronized.`);
+
+      // 4. Fire-and-forget sync to Firestore in background without blocking UI
+      updateFirm(selectedFirm.id, updates).catch(() => {});
     } catch (err: any) {
       setQuickEditError(err.message || 'Save failed. Please try again.');
     } finally {
@@ -297,6 +310,19 @@ export default function AdminFirmFileSystemPage() {
     }
   };
 
+  const handleDeleteFirm = (id: string) => {
+    const target = firms.find((f) => f.id === id || f.slug === id);
+    if (!confirm(`Are you sure you want to permanently delete "${target?.name || id}" from the directory?`)) return;
+    deleteStoredFirm(id);
+    if (target?.slug) deleteStoredFirm(target.slug);
+    const updated = getStoredFirms();
+    setFirms(updated);
+    if (selectedFirmId === id || selectedFirmId === target?.slug) {
+      setSelectedFirmId(updated.length > 0 ? updated[0].id : '');
+    }
+    deleteFirm(id).catch(() => {});
+  };
+
   // Load existing firms & challenges directly from real Firestore database
   useEffect(() => {
     const localF = getStoredFirms();
@@ -311,9 +337,13 @@ export default function AdminFirmFileSystemPage() {
       try {
         const [liveFirms, liveChalls] = await Promise.all([getFirms(), getChallenges()]);
         if (liveFirms && liveFirms.length > 0) {
-          setFirms(liveFirms);
-          if (!selectedFirmId || !liveFirms.some((f) => f.id === selectedFirmId)) {
-            setSelectedFirmId(liveFirms[0].id);
+          const deletedIds = getDeletedFirmIds();
+          const cleanFirms = liveFirms.filter(
+            (f) => !deletedIds.has((f.id || '').toLowerCase()) && !deletedIds.has((f.slug || '').toLowerCase())
+          );
+          setFirms(cleanFirms);
+          if (!selectedFirmId || !cleanFirms.some((f) => f.id === selectedFirmId)) {
+            setSelectedFirmId(cleanFirms.length > 0 ? cleanFirms[0].id : '');
           }
         }
         if (liveChalls && liveChalls.length > 0) {
@@ -946,14 +976,28 @@ export default function AdminFirmFileSystemPage() {
                     : 'border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-900/60 text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-md bg-white border border-zinc-200 dark:border-zinc-700 flex items-center justify-center overflow-hidden">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-6 h-6 rounded-md bg-white border border-zinc-200 dark:border-zinc-700 flex items-center justify-center overflow-hidden shrink-0">
                     {/* Authentic partner logo */}
                     <img src={f.logo_url} alt={f.name} className="w-5 h-5 object-contain" />
                   </div>
-                  <span>{f.name}</span>
+                  <span className="truncate">{f.name}</span>
                 </div>
-                {selectedFirmId === f.id && <Check className="w-3.5 h-3.5 text-foreground" />}
+                <div className="flex items-center gap-1 shrink-0">
+                  {selectedFirmId === f.id && <Check className="w-3.5 h-3.5 text-foreground" />}
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteFirm(f.id);
+                    }}
+                    className="p-1 rounded text-muted-foreground hover:text-red-500 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                    title={`Delete ${f.name}`}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </span>
+                </div>
               </button>
             ))}
           </div>

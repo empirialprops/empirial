@@ -36,6 +36,7 @@ import {
   addStoredFirm,
   updateStoredFirm,
   deleteStoredFirm,
+  getDeletedFirmIds,
 } from '@/lib/utils/firms-store';
 import { logAdminAction } from '@/lib/utils/audit-log-store';
 import { PlatformItem, getStoredPlatforms } from '@/lib/utils/platforms-store';
@@ -166,29 +167,34 @@ export default function AdminFirmsPage() {
     async function loadFirms() {
       try {
         const data = await getFirms();
+        const deletedIds = getDeletedFirmIds();
+        const currentLocal = getStoredFirms().filter(
+          (f) => !deletedIds.has((f.id || '').toLowerCase()) && !deletedIds.has((f.slug || '').toLowerCase())
+        );
+
         if (data && data.length > 0) {
           const map = new Map<string, Firm>();
-          // Preserve local additions first
-          local.forEach((f) => map.set(f.id || f.slug, f));
-          // Merge with live Firestore records
-          data.forEach((f) => {
+          // Start with Firestore records
+          data
+            .filter((f) => !deletedIds.has((f.id || '').toLowerCase()) && !deletedIds.has((f.slug || '').toLowerCase()))
+            .forEach((f) => map.set(f.id || f.slug, f));
+          // Overlay local edits so user's recent edits always take precedence!
+          currentLocal.forEach((f) => {
             const key = f.id || f.slug;
             map.set(key, { ...(map.get(key) || {}), ...f });
           });
           const merged = Array.from(map.values());
           setFirms(merged);
           saveStoredFirms(merged);
-        } else if (!local || local.length === 0) {
-          const uniqueMocks = Array.from(new Map(MOCK_FIRMS.map((item) => [item.id, item])).values());
+        } else if (!currentLocal || currentLocal.length === 0) {
+          const uniqueMocks = Array.from(new Map(MOCK_FIRMS.map((item) => [item.id, item])).values()).filter(
+            (f) => !deletedIds.has((f.id || '').toLowerCase()) && !deletedIds.has((f.slug || '').toLowerCase())
+          );
           setFirms(uniqueMocks);
           saveStoredFirms(uniqueMocks);
         }
       } catch (err) {
-        console.error('Failed to load firms from Firestore:', err);
-        if (!local || local.length === 0) {
-          const uniqueMocks = Array.from(new Map(MOCK_FIRMS.map((item) => [item.id, item])).values());
-          setFirms(uniqueMocks);
-        }
+        console.warn('Silent fallback for firms load:', err);
       } finally {
         setLoading(false);
       }
@@ -406,49 +412,60 @@ export default function AdminFirmsPage() {
     setIsGlobalSaving(true);
     setGlobalSaveFeedback(null);
     try {
-      // 1. Persist to local store & trigger custom events
+      // 1. Persist to local store & trigger custom events immediately
       saveStoredFirms(firms);
 
-      // 2. Push all firms to Firestore in parallel
-      const syncPromises = firms.map((firm) => updateFirm(firm.id, firm));
-      await Promise.allSettled(syncPromises);
-
-      // 3. Cascade updates (coupon, affiliate link, discount, logo) to linked challenges
+      // 2. Cascade firm details (coupon, affiliate link, discount, logo) to local stored challenges in one clean synchronous pass
       try {
-        const { getStoredChallenges, updateStoredChallenge } = await import('@/lib/utils/challenges-store');
-        const { updateChallenge } = await import('@/lib/firebase/services');
+        const { getStoredChallenges, saveStoredChallenges } = await import('@/lib/utils/challenges-store');
         const allChallenges = getStoredChallenges();
-        for (const firm of firms) {
-          const linked = allChallenges.filter((c) => c.firm_id === firm.id || c.firm_slug === firm.slug);
-          for (const ch of linked) {
-            const updates: any = {};
-            if (firm.coupon_code_custom && ch.coupon_code !== firm.coupon_code_custom) {
-              updates.coupon_code = firm.coupon_code_custom;
+        let changedCount = 0;
+        const updatedChalls = allChallenges.map((ch) => {
+          const matchedFirm = firms.find((f) => f.id === ch.firm_id || f.slug === ch.firm_slug);
+          if (matchedFirm) {
+            let chChanged = false;
+            const updated = { ...ch };
+            if (matchedFirm.coupon_code_custom && updated.coupon_code !== matchedFirm.coupon_code_custom) {
+              updated.coupon_code = matchedFirm.coupon_code_custom;
+              chChanged = true;
             }
-            if (firm.buy_url && ch.buy_url !== firm.buy_url) {
-              updates.buy_url = firm.buy_url;
+            if (matchedFirm.buy_url && updated.buy_url !== matchedFirm.buy_url) {
+              updated.buy_url = matchedFirm.buy_url;
+              chChanged = true;
             }
-            if (firm.discount_pct !== undefined && ch.discount_pct !== firm.discount_pct) {
-              updates.discount_pct = firm.discount_pct;
+            if (matchedFirm.discount_pct !== undefined && updated.discount_pct !== matchedFirm.discount_pct) {
+              updated.discount_pct = matchedFirm.discount_pct;
+              if (updated.price > 0) {
+                updated.discounted_price = Math.round(updated.price * (1 - matchedFirm.discount_pct / 100));
+              }
+              chChanged = true;
             }
-            if (firm.logo_url && ch.firm_logo !== firm.logo_url) {
-              updates.firm_logo = firm.logo_url;
+            if (matchedFirm.logo_url && updated.firm_logo !== matchedFirm.logo_url) {
+              updated.firm_logo = matchedFirm.logo_url;
+              chChanged = true;
             }
-            if (Object.keys(updates).length > 0) {
-              updateStoredChallenge(ch.id, updates);
-              try { await updateChallenge(ch.id, updates); } catch {}
+            if (chChanged) {
+              changedCount++;
+              return updated;
             }
           }
+          return ch;
+        });
+        if (changedCount > 0) {
+          saveStoredChallenges(updatedChalls);
         }
-      } catch (syncErr) {
-        console.warn('Challenge cascade sync warning:', syncErr);
+      } catch (cascadeErr) {
+        console.warn('Challenge cascade sync warning:', cascadeErr);
       }
+
+      // 3. Fire-and-forget sync to Firestore in background without blocking UI
+      Promise.allSettled(firms.map((firm) => updateFirm(firm.id, firm))).catch(() => {});
 
       setGlobalSaveFeedback({
         type: 'success',
-        message: `✓ All ${firms.length} prop firms successfully saved & synced across database and challenges!`,
+        message: `✓ All ${firms.length} prop firms successfully saved & synced across website!`,
       });
-      setTimeout(() => setGlobalSaveFeedback(null), 5000);
+      setTimeout(() => setGlobalSaveFeedback(null), 4000);
     } catch (err: any) {
       console.error('Failed to sync firms:', err);
       setGlobalSaveFeedback({
@@ -462,16 +479,20 @@ export default function AdminFirmsPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to permanently remove this firm profile?')) return;
-    const targetFirm = firms.find((f) => f.id === id);
+    const targetFirm = firms.find((f) => f.id === id || f.slug === id);
+    
+    // 1. Immediately delete locally & permanently register into deleted blacklist
     deleteStoredFirm(id);
-    const nextFirms = firms.filter((f) => f.id !== id);
+    if (targetFirm?.slug) {
+      deleteStoredFirm(targetFirm.slug);
+    }
+    const nextFirms = firms.filter((f) => f.id !== id && f.slug !== id && (!targetFirm?.slug || f.slug !== targetFirm.slug));
     setFirms(nextFirms);
     saveStoredFirms(nextFirms);
-    try {
-      await deleteFirm(id);
-    } catch (err) {
-      console.error('Failed to delete firm:', err);
-    }
+
+    // 2. Sync deletion to Firestore in background without blocking UI
+    deleteFirm(id).catch(() => {});
+
     logAdminAction({
       action: `Deleted Prop Firm: ${targetFirm?.name || id}`,
       module: 'firms',
@@ -482,7 +503,7 @@ export default function AdminFirmsPage() {
     });
     setGlobalSaveFeedback({
       type: 'success',
-      message: `Removed ${targetFirm?.name || 'firm'} from directory.`,
+      message: `Permanently removed ${targetFirm?.name || 'firm'} from directory.`,
     });
     setTimeout(() => setGlobalSaveFeedback(null), 3500);
   };
@@ -555,39 +576,38 @@ export default function AdminFirmsPage() {
 
     if (editingFirm) {
       const updatedFirm: Firm = { ...editingFirm, ...firmPayload };
-      const nextFirms = firms.map((f) => (f.id === editingFirm.id ? updatedFirm : f));
+      const nextFirms = firms.map((f) => (f.id === editingFirm.id || f.slug === editingFirm.slug ? updatedFirm : f));
       setFirms(nextFirms);
       updateStoredFirm(editingFirm.id, firmPayload);
       saveStoredFirms(nextFirms);
 
+      // Cascade updates to challenges locally in one pass
       try {
-        await updateFirm(editingFirm.id, firmPayload);
-      } catch (err) {
-        console.error('Failed to update firm:', err);
-      }
-
-      // Cascade updates to challenges
-      try {
-        const { getStoredChallenges, updateStoredChallenge } = await import('@/lib/utils/challenges-store');
-        const { updateChallenge } = await import('@/lib/firebase/services');
+        const { getStoredChallenges, saveStoredChallenges } = await import('@/lib/utils/challenges-store');
         const allChallenges = getStoredChallenges();
-        const firmChallenges = allChallenges.filter(
-          (c) => c.firm_id === editingFirm.id || c.firm_slug === editingFirm.slug
-        );
-        for (const ch of firmChallenges) {
-          const chUpdates: any = {};
-          if (firmPayload.coupon_code_custom) chUpdates.coupon_code = firmPayload.coupon_code_custom;
-          if (firmPayload.buy_url) chUpdates.buy_url = firmPayload.buy_url;
-          if (firmPayload.discount_pct !== undefined) chUpdates.discount_pct = firmPayload.discount_pct;
-          if (firmPayload.logo_url) chUpdates.firm_logo = firmPayload.logo_url;
-          if (Object.keys(chUpdates).length > 0) {
-            updateStoredChallenge(ch.id, chUpdates);
-            try { await updateChallenge(ch.id, chUpdates); } catch {}
+        let changed = false;
+        const updatedChallenges = allChallenges.map((ch) => {
+          if (ch.firm_id === editingFirm.id || ch.firm_slug === editingFirm.slug) {
+            changed = true;
+            return {
+              ...ch,
+              coupon_code: firmPayload.coupon_code_custom || ch.coupon_code,
+              buy_url: firmPayload.buy_url || ch.buy_url,
+              discount_pct: firmPayload.discount_pct !== undefined ? firmPayload.discount_pct : ch.discount_pct,
+              firm_logo: firmPayload.logo_url || ch.firm_logo,
+            };
           }
+          return ch;
+        });
+        if (changed) {
+          saveStoredChallenges(updatedChallenges);
         }
       } catch (cascadeErr) {
-        console.warn('Cascade update error:', cascadeErr);
+        console.warn('Cascade update warning:', cascadeErr);
       }
+
+      // Background sync to Firestore without blocking UI
+      updateFirm(editingFirm.id, firmPayload).catch(() => {});
 
       logAdminAction({
         action: `Updated Prop Firm: ${firmPayload.name}`,
@@ -605,17 +625,14 @@ export default function AdminFirmsPage() {
       setTimeout(() => setGlobalSaveFeedback(null), 4000);
     } else {
       let createdId = slug || `firm-${Date.now()}`;
-      try {
-        const fsId = await createFirm(firmPayload);
-        if (fsId) createdId = fsId;
-      } catch (err) {
-        console.error('Failed to create firm:', err);
-      }
       const newFirm: Firm = { id: createdId, ...firmPayload };
       const nextFirms = [newFirm, ...firms.filter((f) => f.id !== createdId && f.slug !== newFirm.slug)];
       setFirms(nextFirms);
       addStoredFirm(newFirm);
       saveStoredFirms(nextFirms);
+
+      // Background sync to Firestore without blocking UI
+      createFirm(firmPayload).catch(() => {});
 
       logAdminAction({
         action: `Created Prop Firm: ${firmPayload.name}`,

@@ -57,7 +57,8 @@ import {
   saveStoredFirms, 
   addStoredFirm, 
   updateStoredFirm, 
-  deleteStoredFirm 
+  deleteStoredFirm,
+  getDeletedFirmIds,
 } from '../utils/firms-store';
 import { 
   getStoredReviews, 
@@ -212,17 +213,27 @@ export async function getFirms(): Promise<Firm[]> {
   if (!db) return localFirms;
   try {
     const colRef = collection(db, 'firms');
-    const snap = await getDocs(query(colRef, orderBy('name')));
+    const snap = await Promise.race([
+      getDocs(query(colRef, orderBy('name'))),
+      new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), 2500))
+    ]);
+    if (!snap) return localFirms;
     const firestoreFirms = mapSnapshot<Firm>(snap);
     if (firestoreFirms && firestoreFirms.length > 0) {
+      const deletedIds = typeof window !== 'undefined' ? getDeletedFirmIds() : new Set<string>();
+      const validFirms = firestoreFirms.filter(
+        (f) =>
+          !deletedIds.has((f.id || '').toLowerCase()) &&
+          !deletedIds.has((f.slug || '').toLowerCase())
+      );
       if (typeof window !== 'undefined') {
-        saveStoredFirms(firestoreFirms);
+        saveStoredFirms(validFirms);
       }
-      return firestoreFirms;
+      return validFirms;
     }
     return localFirms.length > 0 ? localFirms : MOCK_FIRMS;
   } catch (err) {
-    console.error('Failed to fetch firms from Firestore:', err);
+    console.warn('Failed to fetch firms from Firestore:', err);
     return localFirms.length > 0 ? localFirms : MOCK_FIRMS;
   }
 }
@@ -236,95 +247,78 @@ export async function getFirmBySlug(slug: string): Promise<Firm | null> {
 }
 
 export async function createFirm(firm: Omit<Firm, 'id'> & { id?: string }): Promise<string> {
-  const id = firm.id || firm.name.toLowerCase().replace(/\s+/g, '-');
+  const id = firm.id || firm.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
   const fullFirm: Firm = {
     ...firm,
     id,
     rating: firm.rating || 0,
     review_count: firm.review_count || 0,
   };
-  if (db) {
-    try {
-      const docRef = doc(db, 'firms', id);
-      await setDoc(docRef, {
-        ...fullFirm,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
-    } catch (err) {
-      console.error('Failed to create firm in Firestore:', err);
-    }
-  }
+
+  // 1. Immediately persist locally
   if (typeof window !== 'undefined') {
     addStoredFirm(fullFirm);
   }
+
+  // 2. Sync to Firestore with timeout in background
+  if (db) {
+    try {
+      const docRef = doc(db, 'firms', id);
+      await Promise.race([
+        setDoc(docRef, {
+          ...fullFirm,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }, { merge: true }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), 2000))
+      ]);
+    } catch (err) {
+      console.warn('Firestore createFirm notice:', err);
+    }
+  }
+
   return id;
 }
 
 export async function updateFirm(id: string, firm: Partial<Firm>): Promise<void> {
+  // 1. Immediately persist locally
+  if (typeof window !== 'undefined') {
+    updateStoredFirm(id, firm);
+  }
+
+  // 2. Sync to Firestore with timeout in background
   if (db) {
     try {
       const docRef = doc(db, 'firms', id);
-      await setDoc(docRef, {
-        ...firm,
-        updated_at: new Date().toISOString()
-      }, { merge: true });
-
-      // Cascade denormalized data updates to challenges, deals, and payouts
-      if (firm.name || firm.logo_url || firm.slug) {
-        const batch = writeBatch(db);
-        
-        // Updates challenges
-        const challsSnap = await getDocs(query(collection(db, 'challenges'), where('firm_id', '==', id)));
-        challsSnap.forEach((challDoc) => {
-          const updates: any = {};
-          if (firm.name) updates.firm_name = firm.name;
-          if (firm.logo_url) updates.firm_logo = firm.logo_url;
-          if (firm.slug) updates.firm_slug = firm.slug;
-          batch.update(challDoc.ref, updates);
-        });
-
-        // Updates deals
-        const dealsSnap = await getDocs(query(collection(db, 'deals'), where('firm_id', '==', id)));
-        dealsSnap.forEach((dealDoc) => {
-          const updates: any = {};
-          if (firm.name) updates.firm_name = firm.name;
-          if (firm.logo_url) updates.firm_logo = firm.logo_url;
-          if (firm.slug) updates.firm_slug = firm.slug;
-          batch.update(dealDoc.ref, updates);
-        });
-
-        await batch.commit();
-      }
+      await Promise.race([
+        setDoc(docRef, {
+          ...firm,
+          updated_at: new Date().toISOString()
+        }, { merge: true }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), 2000))
+      ]);
     } catch (err) {
-      console.error('Failed to update firm in Firestore:', err);
+      console.warn('Firestore updateFirm notice:', err);
     }
-  }
-
-  if (typeof window !== 'undefined') {
-    updateStoredFirm(id, firm);
   }
 }
 
 export async function deleteFirm(id: string): Promise<void> {
-  if (db) {
-    try {
-      await deleteDoc(doc(db, 'firms', id));
-      
-      // Cascade delete challenges and deals
-      const batch = writeBatch(db);
-      const challsSnap = await getDocs(query(collection(db, 'challenges'), where('firm_id', '==', id)));
-      challsSnap.forEach(d => batch.delete(d.ref));
-      const dealsSnap = await getDocs(query(collection(db, 'deals'), where('firm_id', '==', id)));
-      dealsSnap.forEach(d => batch.delete(d.ref));
-      await batch.commit();
-    } catch (err) {
-      console.error('Failed to delete firm from Firestore:', err);
-    }
-  }
-
+  // 1. Immediately persist locally
   if (typeof window !== 'undefined') {
     deleteStoredFirm(id);
+  }
+
+  // 2. Sync deletion to Firestore with timeout in background
+  if (db) {
+    try {
+      await Promise.race([
+        deleteDoc(doc(db, 'firms', id)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), 2000))
+      ]);
+    } catch (err) {
+      console.warn('Firestore deleteFirm notice:', err);
+    }
   }
 }
 

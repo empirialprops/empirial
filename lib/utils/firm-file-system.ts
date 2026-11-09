@@ -715,11 +715,7 @@ export async function commitFirmImport(
     const idsToRemove = currentFirmChallenges.map((c) => c.id);
     deleteMultipleStoredChallenges(idsToRemove);
     if (db) {
-      try {
-        await deleteChallengesBatch(idsToRemove);
-      } catch (e) {
-        console.warn('Firestore batch delete failed:', e);
-      }
+      deleteChallengesBatch(idsToRemove).catch(() => {});
     }
   }
 
@@ -780,15 +776,16 @@ export async function commitFirmImport(
   // Save new challenges locally
   addStoredChallenges(newChallenges);
 
-  // Sync with Firestore
+  // Background sync with Firestore without holding up the user
   if (db) {
-    for (const ch of newChallenges) {
-      try {
-        await createChallenge(ch);
-      } catch (err) {
-        console.warn(`Failed to sync challenge ${ch.id} to Firestore:`, err);
-      }
-    }
+    Promise.allSettled(
+      newChallenges.map((ch) =>
+        Promise.race([
+          createChallenge(ch),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000)),
+        ])
+      )
+    ).catch(() => {});
   }
 
   // Audit log
