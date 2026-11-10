@@ -17,6 +17,13 @@ import {
   Plus,
   Send,
   AlertCircle,
+  Globe,
+  Share2,
+  Copy,
+  Check,
+  RefreshCw,
+  Phone,
+  Link2,
 } from 'lucide-react';
 import {
   SocialPost,
@@ -34,12 +41,27 @@ import {
   createSocialPost,
 } from '@/lib/utils/social-store';
 import { getStoredUser, UserProfile, DEMO_ADMIN } from '@/lib/utils/auth-store';
+import {
+  getStoredSocialLinks,
+  saveStoredSocialLinks,
+  fetchRemoteSocialLinks,
+  SocialLinksConfig,
+  CustomSocialLink,
+  DEFAULT_SOCIAL_LINKS,
+} from '@/lib/utils/socials-store';
 
 export default function AdminSocialPage() {
-  const [activeTab, setActiveTab] = useState<'applications' | 'creators' | 'posts' | 'broadcast'>('applications');
+  const [activeTab, setActiveTab] = useState<'socials' | 'applications' | 'creators' | 'posts' | 'broadcast'>('socials');
   const [applications, setApplications] = useState<VerificationApplication[]>([]);
   const [posts, setPosts] = useState<SocialPost[]>([]);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+
+  // Official Socials State
+  const [socialsConfig, setSocialsConfig] = useState<SocialLinksConfig>(DEFAULT_SOCIAL_LINKS);
+  const [isSavingSocials, setIsSavingSocials] = useState(false);
+  const [socialSaveSuccess, setSocialSaveSuccess] = useState<string | null>(null);
+  const [socialSaveError, setSocialSaveError] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
   // Broadcast state
   const [broadcastContent, setBroadcastContent] = useState('');
@@ -51,6 +73,11 @@ export default function AdminSocialPage() {
     setApplications(getStoredVerificationApplications());
     setPosts(getStoredSocialPosts());
     setCurrentUser(getStoredUser() || DEMO_ADMIN);
+    const initialSocials = getStoredSocialLinks();
+    setSocialsConfig(initialSocials);
+    fetchRemoteSocialLinks().then((remote) => {
+      if (remote) setSocialsConfig(remote);
+    });
   };
 
   useEffect(() => {
@@ -58,13 +85,19 @@ export default function AdminSocialPage() {
 
     const handleApps = () => setApplications(getStoredVerificationApplications());
     const handlePosts = () => setPosts(getStoredSocialPosts());
+    const handleSocials = (e: any) => {
+      if (e.detail) setSocialsConfig(e.detail);
+      else setSocialsConfig(getStoredSocialLinks());
+    };
 
     window.addEventListener('verification-apps-changed', handleApps);
     window.addEventListener('social-posts-changed', handlePosts);
+    window.addEventListener('empirial-socials-updated', handleSocials);
 
     return () => {
       window.removeEventListener('verification-apps-changed', handleApps);
       window.removeEventListener('social-posts-changed', handlePosts);
+      window.removeEventListener('empirial-socials-updated', handleSocials);
     };
   }, []);
 
@@ -96,6 +129,67 @@ export default function AdminSocialPage() {
   const handlePinPost = (postId: string) => {
     pinSocialPost(postId);
     loadData();
+  };
+
+  // Official Socials Handlers
+  const handleSaveSocials = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setIsSavingSocials(true);
+    setSocialSaveSuccess(null);
+    setSocialSaveError(null);
+
+    try {
+      await saveStoredSocialLinks(socialsConfig);
+      setSocialSaveSuccess('✓ Official social links updated and synchronized across Footer, Contact page, and all live surfaces!');
+      setTimeout(() => setSocialSaveSuccess(null), 4000);
+    } catch (err: any) {
+      console.error('Failed to save official social links:', err);
+      setSocialSaveError(err.message || 'Failed to save social links. Please try again.');
+    } finally {
+      setIsSavingSocials(false);
+    }
+  };
+
+  const handleCopySocial = (text: string, key: string) => {
+    if (!text) return;
+    if (typeof navigator !== 'undefined') {
+      navigator.clipboard.writeText(text);
+      setCopiedLink(key);
+      setTimeout(() => setCopiedLink(null), 2000);
+    }
+  };
+
+  const handleAddCustomLink = () => {
+    const newLink: CustomSocialLink = {
+      id: `custom_${Date.now()}`,
+      name: 'Custom Channel',
+      url: 'https://',
+      enabled: true,
+    };
+    setSocialsConfig((prev) => ({
+      ...prev,
+      customLinks: [...prev.customLinks, newLink],
+    }));
+  };
+
+  const handleUpdateCustomLink = (id: string, updates: Partial<CustomSocialLink>) => {
+    setSocialsConfig((prev) => ({
+      ...prev,
+      customLinks: prev.customLinks.map((item) => (item.id === id ? { ...item, ...updates } : item)),
+    }));
+  };
+
+  const handleDeleteCustomLink = (id: string) => {
+    setSocialsConfig((prev) => ({
+      ...prev,
+      customLinks: prev.customLinks.filter((item) => item.id !== id),
+    }));
+  };
+
+  const handleResetSocials = () => {
+    if (confirm('Reset all official social links to default EMPIRIAL channels?')) {
+      setSocialsConfig(DEFAULT_SOCIAL_LINKS);
+    }
   };
 
   const handleBroadcast = (e: React.FormEvent) => {
@@ -148,10 +242,23 @@ export default function AdminSocialPage() {
       <div className="flex items-center gap-2 border-b border-white/10 pb-2 overflow-x-auto text-xs font-semibold">
         <button
           type="button"
+          onClick={() => setActiveTab('socials')}
+          className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 cursor-pointer ${
+            activeTab === 'socials'
+              ? 'bg-white text-black shadow font-bold'
+              : 'bg-elevation-card text-slate-400 hover:text-white'
+          }`}
+        >
+          <Share2 className="w-4 h-4" />
+          <span>Official Socials &amp; Sync</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab('applications')}
           className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 cursor-pointer ${
             activeTab === 'applications'
-              ? 'bg-purple-500 text-white shadow'
+              ? 'bg-white text-black shadow font-bold'
               : 'bg-elevation-card text-slate-400 hover:text-white'
           }`}
         >
@@ -164,7 +271,7 @@ export default function AdminSocialPage() {
           onClick={() => setActiveTab('posts')}
           className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 cursor-pointer ${
             activeTab === 'posts'
-              ? 'bg-purple-500 text-white shadow'
+              ? 'bg-white text-black shadow font-bold'
               : 'bg-elevation-card text-slate-400 hover:text-white'
           }`}
         >
@@ -177,7 +284,7 @@ export default function AdminSocialPage() {
           onClick={() => setActiveTab('broadcast')}
           className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 cursor-pointer ${
             activeTab === 'broadcast'
-              ? 'bg-purple-500 text-white shadow'
+              ? 'bg-white text-black shadow font-bold'
               : 'bg-elevation-card text-slate-400 hover:text-white'
           }`}
         >
@@ -185,6 +292,502 @@ export default function AdminSocialPage() {
           <span>Admin Broadcast</span>
         </button>
       </div>
+
+      {/* Tab 0: Official Socials Manager & Real-Time Sync */}
+      {activeTab === 'socials' && (
+        <div className="space-y-6">
+          {/* Header Banner */}
+          <div className="p-5 rounded-2xl bg-elevation-surface border border-white/10 space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center text-white">
+                  <Share2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                    Official Brand Socials &amp; Channels
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Manage and synchronize EMPIRIAL&apos;s verified social links across the Footer, Contact Desk, and public spaces in real time.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleResetSocials}
+                  className="px-3 py-2 rounded-xl border border-white/10 bg-elevation-base text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer"
+                >
+                  Reset Defaults
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveSocials}
+                  disabled={isSavingSocials}
+                  className="px-4 py-2 rounded-xl bg-white text-black hover:bg-slate-200 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                >
+                  {isSavingSocials ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Syncing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Save &amp; Sync Everywhere</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {socialSaveSuccess && (
+              <div className="mt-3 p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex items-center gap-2 animate-in fade-in duration-150">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{socialSaveSuccess}</span>
+              </div>
+            )}
+            {socialSaveError && (
+              <div className="mt-3 p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 text-rose-400 text-xs font-semibold flex items-center gap-2 animate-in fade-in duration-150">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{socialSaveError}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Social Channels Inputs Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Discord */}
+            <div className="p-4 rounded-xl bg-elevation-surface border border-white/10 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-white flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-[#5865F2]/20 border border-[#5865F2]/40 flex items-center justify-center text-white text-[11px] font-bold">
+                    D
+                  </span>
+                  <span>Discord Community / Ticket Server</span>
+                </label>
+                {socialsConfig.discordUrl && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleCopySocial(socialsConfig.discordUrl, 'discord')}
+                      className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer"
+                      title="Copy URL"
+                    >
+                      {copiedLink === 'discord' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    </button>
+                    <a
+                      href={socialsConfig.discordUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1"
+                      title="Open in new tab"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
+              <input
+                type="url"
+                value={socialsConfig.discordUrl}
+                onChange={(e) => setSocialsConfig({ ...socialsConfig, discordUrl: e.target.value })}
+                placeholder="https://discord.gg/..."
+                className="w-full bg-elevation-base border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-white font-mono"
+              />
+              <p className="text-[11px] text-slate-400">Syncs to: Footer Discord icon, Contact page ticket card &amp; network strip.</p>
+            </div>
+
+            {/* X / Twitter */}
+            <div className="p-4 rounded-xl bg-elevation-surface border border-white/10 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-white flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center text-white text-[11px] font-bold">
+                    𝕏
+                  </span>
+                  <span>X / Twitter Official Handle</span>
+                </label>
+                {socialsConfig.twitterUrl && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleCopySocial(socialsConfig.twitterUrl, 'twitter')}
+                      className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer"
+                      title="Copy URL"
+                    >
+                      {copiedLink === 'twitter' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    </button>
+                    <a
+                      href={socialsConfig.twitterUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1"
+                      title="Open in new tab"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
+              <input
+                type="url"
+                value={socialsConfig.twitterUrl}
+                onChange={(e) => setSocialsConfig({ ...socialsConfig, twitterUrl: e.target.value })}
+                placeholder="https://x.com/..."
+                className="w-full bg-elevation-base border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-white font-mono"
+              />
+              <p className="text-[11px] text-slate-400">Syncs to: Footer X icon, Contact page network pill.</p>
+            </div>
+
+            {/* Telegram */}
+            <div className="p-4 rounded-xl bg-elevation-surface border border-white/10 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-white flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-[#229ED9]/20 border border-[#229ED9]/40 flex items-center justify-center text-white text-[11px] font-bold">
+                    ✈
+                  </span>
+                  <span>Telegram Channel &amp; Updates</span>
+                </label>
+                {socialsConfig.telegramUrl && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleCopySocial(socialsConfig.telegramUrl, 'telegram')}
+                      className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer"
+                      title="Copy URL"
+                    >
+                      {copiedLink === 'telegram' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    </button>
+                    <a
+                      href={socialsConfig.telegramUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1"
+                      title="Open in new tab"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
+              <input
+                type="url"
+                value={socialsConfig.telegramUrl}
+                onChange={(e) => setSocialsConfig({ ...socialsConfig, telegramUrl: e.target.value })}
+                placeholder="https://t.me/..."
+                className="w-full bg-elevation-base border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-white font-mono"
+              />
+              <p className="text-[11px] text-slate-400">Syncs to: Footer Telegram icon, Contact page network pill.</p>
+            </div>
+
+            {/* YouTube */}
+            <div className="p-4 rounded-xl bg-elevation-surface border border-white/10 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-white flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-[#FF0000]/20 border border-[#FF0000]/40 flex items-center justify-center text-white text-[11px] font-bold">
+                    ▶
+                  </span>
+                  <span>YouTube Channel</span>
+                </label>
+                {socialsConfig.youtubeUrl && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleCopySocial(socialsConfig.youtubeUrl, 'youtube')}
+                      className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer"
+                      title="Copy URL"
+                    >
+                      {copiedLink === 'youtube' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    </button>
+                    <a
+                      href={socialsConfig.youtubeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1"
+                      title="Open in new tab"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
+              <input
+                type="url"
+                value={socialsConfig.youtubeUrl}
+                onChange={(e) => setSocialsConfig({ ...socialsConfig, youtubeUrl: e.target.value })}
+                placeholder="https://www.youtube.com/@..."
+                className="w-full bg-elevation-base border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-white font-mono"
+              />
+              <p className="text-[11px] text-slate-400">Syncs to: Footer YouTube icon, Contact page network pill.</p>
+            </div>
+
+            {/* Instagram */}
+            <div className="p-4 rounded-xl bg-elevation-surface border border-white/10 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-white flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-[#E1306C]/20 border border-[#E1306C]/40 flex items-center justify-center text-white text-[11px] font-bold">
+                    📷
+                  </span>
+                  <span>Instagram Profile</span>
+                </label>
+                {socialsConfig.instagramUrl && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleCopySocial(socialsConfig.instagramUrl, 'instagram')}
+                      className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer"
+                      title="Copy URL"
+                    >
+                      {copiedLink === 'instagram' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    </button>
+                    <a
+                      href={socialsConfig.instagramUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1"
+                      title="Open in new tab"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
+              <input
+                type="url"
+                value={socialsConfig.instagramUrl}
+                onChange={(e) => setSocialsConfig({ ...socialsConfig, instagramUrl: e.target.value })}
+                placeholder="https://www.instagram.com/..."
+                className="w-full bg-elevation-base border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-white font-mono"
+              />
+              <p className="text-[11px] text-slate-400">Syncs to: Footer Instagram icon, Contact page network pill.</p>
+            </div>
+
+            {/* WhatsApp */}
+            <div className="p-4 rounded-xl bg-elevation-surface border border-white/10 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-white flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-[#25D366]/20 border border-[#25D366]/40 flex items-center justify-center text-white text-[11px] font-bold">
+                    💬
+                  </span>
+                  <span>WhatsApp Support Hotline / Group URL</span>
+                </label>
+                {socialsConfig.whatsappUrl && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleCopySocial(socialsConfig.whatsappUrl, 'whatsapp')}
+                      className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer"
+                      title="Copy URL"
+                    >
+                      {copiedLink === 'whatsapp' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    </button>
+                    <a
+                      href={socialsConfig.whatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1"
+                      title="Open in new tab"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
+              <input
+                type="url"
+                value={socialsConfig.whatsappUrl}
+                onChange={(e) => setSocialsConfig({ ...socialsConfig, whatsappUrl: e.target.value })}
+                placeholder="https://wa.me/..."
+                className="w-full bg-elevation-base border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-white font-mono"
+              />
+              <p className="text-[11px] text-slate-400">Syncs to: Footer WhatsApp icon, Contact page WhatsApp hotline card &amp; link.</p>
+            </div>
+
+            {/* LinkedIn */}
+            <div className="p-4 rounded-xl bg-elevation-surface border border-white/10 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-white flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-[#0A66C2]/20 border border-[#0A66C2]/40 flex items-center justify-center text-white text-[11px] font-bold">
+                    in
+                  </span>
+                  <span>LinkedIn Company / Organization Page</span>
+                </label>
+                {socialsConfig.linkedinUrl && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleCopySocial(socialsConfig.linkedinUrl, 'linkedin')}
+                      className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer"
+                      title="Copy URL"
+                    >
+                      {copiedLink === 'linkedin' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    </button>
+                    <a
+                      href={socialsConfig.linkedinUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1"
+                      title="Open in new tab"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
+              <input
+                type="url"
+                value={socialsConfig.linkedinUrl}
+                onChange={(e) => setSocialsConfig({ ...socialsConfig, linkedinUrl: e.target.value })}
+                placeholder="https://www.linkedin.com/company/..."
+                className="w-full bg-elevation-base border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-white font-mono"
+              />
+              <p className="text-[11px] text-slate-400">Syncs to: Footer LinkedIn icon, Contact page network pill.</p>
+            </div>
+          </div>
+
+          {/* Custom Channels Repeater */}
+          <div className="p-5 rounded-2xl bg-elevation-surface border border-white/10 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Link2 className="w-4 h-4 text-slate-400" />
+                  <span>Custom Channels &amp; Alternate Links ({socialsConfig.customLinks.length})</span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Add optional additional community channels (e.g. Reddit, TikTok, Facebook, Twitch, Medium, GitHub).
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleAddCustomLink}
+                className="px-3 py-1.5 rounded-xl border border-white/10 bg-elevation-base hover:bg-white/10 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Channel</span>
+              </button>
+            </div>
+
+            {socialsConfig.customLinks.length === 0 ? (
+              <div className="p-6 rounded-xl border border-dashed border-white/10 text-center text-xs text-slate-500">
+                No custom channels added. Click &quot;Add Channel&quot; above to create a custom social link.
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {socialsConfig.customLinks.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex flex-col sm:flex-row sm:items-center gap-2.5 p-3 rounded-xl bg-elevation-base border border-white/10"
+                  >
+                    <input
+                      type="text"
+                      value={item.name}
+                      onChange={(e) => handleUpdateCustomLink(item.id, { name: e.target.value })}
+                      placeholder="Platform Name (e.g. Reddit)"
+                      className="sm:w-44 bg-elevation-surface border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none font-semibold"
+                    />
+                    <input
+                      type="url"
+                      value={item.url}
+                      onChange={(e) => handleUpdateCustomLink(item.id, { url: e.target.value })}
+                      placeholder="https://..."
+                      className="flex-1 bg-elevation-surface border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none font-mono"
+                    />
+                    <div className="flex items-center gap-2 shrink-0 justify-end">
+                      <label className="flex items-center gap-1 text-[11px] text-slate-400 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={item.enabled}
+                          onChange={(e) => handleUpdateCustomLink(item.id, { enabled: e.target.checked })}
+                          className="rounded border-white/20 bg-elevation-surface accent-white"
+                        />
+                        <span>Active</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCustomLink(item.id)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/30 transition-colors cursor-pointer"
+                        title="Delete channel"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Live Preview Widget */}
+          <div className="p-5 rounded-2xl bg-elevation-surface border border-white/10 space-y-4">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Live Surface Preview</div>
+              <h3 className="text-sm font-bold text-white mt-0.5">How Socials Render Across EMPIRIAL</h3>
+            </div>
+
+            {/* Footer Preview */}
+            <div className="p-4 rounded-xl bg-zinc-950 border border-white/10 space-y-2">
+              <span className="text-[10px] uppercase tracking-wider font-mono text-slate-400">Footer Icon Strip Preview</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                {socialsConfig.discordUrl && (
+                  <div className="w-9 h-9 rounded-xl border border-zinc-800 bg-zinc-900 text-white flex items-center justify-center text-xs font-bold" title="Discord">
+                    D
+                  </div>
+                )}
+                {socialsConfig.twitterUrl && (
+                  <div className="w-9 h-9 rounded-xl border border-zinc-800 bg-zinc-900 text-white flex items-center justify-center text-xs font-bold" title="Twitter / X">
+                    𝕏
+                  </div>
+                )}
+                {socialsConfig.telegramUrl && (
+                  <div className="w-9 h-9 rounded-xl border border-zinc-800 bg-zinc-900 text-white flex items-center justify-center text-xs" title="Telegram">
+                    ✈
+                  </div>
+                )}
+                {socialsConfig.youtubeUrl && (
+                  <div className="w-9 h-9 rounded-xl border border-zinc-800 bg-zinc-900 text-white flex items-center justify-center text-xs" title="YouTube">
+                    ▶
+                  </div>
+                )}
+                {socialsConfig.instagramUrl && (
+                  <div className="w-9 h-9 rounded-xl border border-zinc-800 bg-zinc-900 text-white flex items-center justify-center text-xs" title="Instagram">
+                    📷
+                  </div>
+                )}
+                {socialsConfig.whatsappUrl && (
+                  <div className="w-9 h-9 rounded-xl border border-zinc-800 bg-zinc-900 text-white flex items-center justify-center text-xs" title="WhatsApp">
+                    💬
+                  </div>
+                )}
+                {socialsConfig.linkedinUrl && (
+                  <div className="w-9 h-9 rounded-xl border border-zinc-800 bg-zinc-900 text-white flex items-center justify-center text-xs font-bold" title="LinkedIn">
+                    in
+                  </div>
+                )}
+                {socialsConfig.customLinks.filter(l => l.enabled).map((link) => (
+                  <div key={link.id} className="h-9 px-3 rounded-xl border border-zinc-800 bg-zinc-900 text-white flex items-center justify-center text-xs font-medium">
+                    {link.name}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={handleSaveSocials}
+                disabled={isSavingSocials}
+                className="px-6 py-2.5 rounded-xl bg-white text-black hover:bg-slate-200 text-xs font-bold transition-all shadow cursor-pointer flex items-center gap-1.5"
+              >
+                {isSavingSocials ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                <span>Save All Socials &amp; Sync Website</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tab 1: Verification Queue */}
       {activeTab === 'applications' && (

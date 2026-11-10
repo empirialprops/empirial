@@ -1,5 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
-  <rect width="200" height="200" rx="40" fill="#09090b"/>
-  <path d="M60 50 L110 50 C145 50 145 150 110 150 L60 150 Z" fill="none" stroke="#ffffff" stroke-width="16" stroke-linejoin="round"/>
-  <path d="M85 75 L110 75 C125 75 125 125 110 125 L85 125 Z" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <rect width="200" height="200" rx="40" fill="#0A0B10"/>
+  <path d="M100 36L156 100L100 164L44 100L100 36Z" stroke="url(#dolvero_gradient)" stroke-width="12" stroke-linejoin="round"/>
+  <path d="M100 68L128 100L100 132L72 100L100 68Z" fill="url(#dolvero_gradient)"/>
+  <circle cx="100" cy="100" r="8" fill="#FFFFFF"/>
+  <defs>
+    <linearGradient id="dolvero_gradient" x1="44" y1="36" x2="156" y2="164" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00D2FF"/>
+      <stop offset="50%" stop-color="#0066FF"/>
+      <stop offset="100%" stop-color="#8000FF"/>
+    </linearGradient>
+  </defs>
 </svg>

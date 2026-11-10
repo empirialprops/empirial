@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Settings, CheckCircle2, Database, AlertTriangle, Globe, Shield, ShieldCheck } from 'lucide-react';
+import Link from 'next/link';
+import { Settings, CheckCircle2, Database, AlertTriangle, Globe, Shield, ShieldCheck, Share2, ExternalLink } from 'lucide-react';
 import { seedDatabase } from '@/lib/firebase/seeder';
 import { getSiteSettings, updateSiteSettings, invalidateSiteSettingsCache } from '@/lib/firebase/services';
 import { syncAllExistingUsersToGoogleSheet, DEFAULT_SHEETS_WEBHOOK_URL } from '@/lib/firebase/sheets-sync';
 import { logAdminAction } from '@/lib/utils/audit-log-store';
+import { getStoredSocialLinks, saveStoredSocialLinks } from '@/lib/utils/socials-store';
 
 export default function AdminSettingsPage() {
   const [sheetsSyncing, setSheetsSyncing] = useState(false);
@@ -21,6 +23,10 @@ export default function AdminSettingsPage() {
   const [twitterUrl, setTwitterUrl] = useState('https://x.com/empirial');
   const [githubUrl, setTwitterGithub] = useState('https://github.com/empirial');
   const [discordUrl, setDiscordUrl] = useState('https://discord.gg/empirial');
+  const [telegramUrl, setTelegramUrl] = useState('https://t.me/empirialprops');
+  const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [instagramUrl, setInstagramUrl] = useState('');
+  const [linkedinUrl, setLinkedinUrl] = useState('');
   
   const [logoDark, setLogoDark] = useState('/logos/empirial-trident-dark.png');
   const [logoLight, setLogoLight] = useState('/logos/empirial-trident-light.png');
@@ -74,9 +80,14 @@ export default function AdminSettingsPage() {
           setContactEmail(settings.contactEmail || settings.contactPage?.email || 'support@empirial.com');
           setContactWhatsapp(settings.contactWhatsapp || settings.contactPage?.whatsapp || '+1 (555) 890-3674');
           setContactWhatsappLink(settings.contactWhatsappLink || settings.contactPage?.whatsappLink || 'https://wa.me/15558903674');
-          setTwitterUrl(settings.twitterUrl || 'https://x.com/empirial');
+          const storedSocials = getStoredSocialLinks();
+          setTwitterUrl(storedSocials.twitterUrl || settings.twitterUrl || 'https://x.com/empirial');
           setTwitterGithub(settings.githubUrl || 'https://github.com/empirial');
-          setDiscordUrl(settings.discordUrl || settings.contactPage?.discordUrl || 'https://discord.gg/empirial');
+          setDiscordUrl(storedSocials.discordUrl || settings.discordUrl || settings.contactPage?.discordUrl || 'https://discord.gg/empirial');
+          setTelegramUrl(storedSocials.telegramUrl || 'https://t.me/empirialprops');
+          setYoutubeUrl(storedSocials.youtubeUrl || '');
+          setInstagramUrl(storedSocials.instagramUrl || '');
+          setLinkedinUrl(storedSocials.linkedinUrl || '');
           setLogoDark(settings.logoDarkUrl || '/logos/empirial-trident-dark.png');
           setLogoLight(settings.logoLightUrl || '/logos/empirial-trident-light.png');
           setFavicon(settings.faviconUrl || '/favicon.ico');
@@ -168,6 +179,10 @@ export default function AdminSettingsPage() {
           discordUrl: discordUrl,
           queryCategories: queryCategories,
         },
+        telegramUrl,
+        youtubeUrl,
+        instagramUrl,
+        linkedinUrl,
         maintenanceMode: maintenance,
         eventPopupEnabled: eventPopup,
         stats: [
@@ -177,6 +192,21 @@ export default function AdminSettingsPage() {
           { value: Number(stat4Value), suffix: stat4Suffix, label: stat4Label }
         ]
       };
+
+      // Also persist and broadcast to the unified socials store so Footer and Contact page instantly update
+      const currentSocials = getStoredSocialLinks();
+      saveStoredSocialLinks({
+        ...currentSocials,
+        discordUrl,
+        twitterUrl,
+        telegramUrl,
+        youtubeUrl,
+        instagramUrl,
+        whatsappUrl: contactWhatsappLink || contactWhatsapp,
+        linkedinUrl,
+        updatedAt: Date.now(),
+      }).catch((e) => console.warn('Socials sync error:', e));
+
       await updateSiteSettings(newSettingsPayload);
       logAdminAction({
         action: `Updated Site Settings & Configuration`,
@@ -466,10 +496,19 @@ export default function AdminSettingsPage() {
 
         {/* Social Networks Links */}
         <div className="space-y-4 pt-4 border-t border-white/5">
-          <h3 className="text-sm font-bold text-white flex items-center gap-2 border-b border-white/5 pb-2">
-            <Globe className="w-4 h-4 text-cyan-400" />
-            <span>Social Network URLs</span>
-          </h3>
+          <div className="flex items-center justify-between border-b border-white/5 pb-2">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Share2 className="w-4 h-4 text-white" />
+              <span>Social Network URLs &amp; Community Channels</span>
+            </h3>
+            <Link
+              href="/admin/social"
+              className="text-xs text-slate-300 hover:text-white flex items-center gap-1 font-semibold"
+            >
+              <span>Manage in Social Desk</span>
+              <ExternalLink className="w-3 h-3" />
+            </Link>
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
             <div className="flex flex-col gap-1">
@@ -482,20 +521,59 @@ export default function AdminSettingsPage() {
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-slate-400 font-medium">GitHub Organization URL</label>
-              <input
-                type="url"
-                value={githubUrl}
-                onChange={(e) => setTwitterGithub(e.target.value)}
-                className="bg-elevation-base border border-white/10 rounded-xl px-3 py-2 text-white"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
               <label className="text-slate-400 font-medium">Discord Server URL</label>
               <input
                 type="url"
                 value={discordUrl}
                 onChange={(e) => setDiscordUrl(e.target.value)}
+                className="bg-elevation-base border border-white/10 rounded-xl px-3 py-2 text-white"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-slate-400 font-medium">Telegram Channel URL</label>
+              <input
+                type="url"
+                value={telegramUrl}
+                onChange={(e) => setTelegramUrl(e.target.value)}
+                className="bg-elevation-base border border-white/10 rounded-xl px-3 py-2 text-white"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-slate-400 font-medium">YouTube Channel URL</label>
+              <input
+                type="url"
+                value={youtubeUrl}
+                onChange={(e) => setYoutubeUrl(e.target.value)}
+                placeholder="https://youtube.com/@..."
+                className="bg-elevation-base border border-white/10 rounded-xl px-3 py-2 text-white"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-slate-400 font-medium">Instagram Profile URL</label>
+              <input
+                type="url"
+                value={instagramUrl}
+                onChange={(e) => setInstagramUrl(e.target.value)}
+                placeholder="https://instagram.com/..."
+                className="bg-elevation-base border border-white/10 rounded-xl px-3 py-2 text-white"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-slate-400 font-medium">LinkedIn Page URL</label>
+              <input
+                type="url"
+                value={linkedinUrl}
+                onChange={(e) => setLinkedinUrl(e.target.value)}
+                placeholder="https://linkedin.com/company/..."
+                className="bg-elevation-base border border-white/10 rounded-xl px-3 py-2 text-white"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-slate-400 font-medium">GitHub Organization URL</label>
+              <input
+                type="url"
+                value={githubUrl}
+                onChange={(e) => setTwitterGithub(e.target.value)}
                 className="bg-elevation-base border border-white/10 rounded-xl px-3 py-2 text-white"
               />
             </div>

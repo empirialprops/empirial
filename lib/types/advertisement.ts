@@ -20,8 +20,13 @@ export interface AdvertisementConfig {
   firmId?: string;            // Associated firm ID (if any)
   firmName?: string;          // Firm Name
   logoUrl?: string;           // Firm logo URL or graphic image URL
+  useEmpirialLogo?: boolean;  // Automatically use official EMPIRIAL light/dark logo
   graphicIcon?: AdGraphicIcon; // Pre-built SVG icon when no logo is used
   customGraphicUrl?: string;  // Uploaded custom graphic / badge
+  backgroundImageUrl?: string; // Background backdrop image (e.g. Trident or Lucid Glass texture)
+  backgroundPosition?: 'watermark-right' | 'watermark-center' | 'cover' | 'contain-left'; // Alignment of background art
+  backgroundMaskFade?: boolean; // Softly fade artwork away from text side to prevent contrast overlap
+  glassOpacity?: number;      // Frosted backdrop opacity percentage (e.g. 10-50%)
   
   // Promotional Offer & Action
   couponCode?: string;        // Optional coupon code for 1-click copy

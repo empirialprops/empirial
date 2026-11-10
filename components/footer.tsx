@@ -7,6 +7,13 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { getSiteSettings } from "@/lib/firebase/services";
 import { EmpirialLogo } from "@/components/ui/empirial-logo";
+import {
+  getStoredSocialLinks,
+  fetchRemoteSocialLinks,
+  SocialLinksConfig,
+  DEFAULT_SOCIAL_LINKS,
+} from "@/lib/utils/socials-store";
+
 const InstagramIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
@@ -33,9 +40,36 @@ const YouTubeIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z" />
+  </svg>
+);
+
+const WhatsAppIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+    <path d="M17.472 14.382c-.301-.15-1.78-.878-2.056-.979-.276-.1-.476-.15-.677.15-.2.301-.777.979-.953 1.18-.175.2-.351.225-.652.075-.301-.15-1.272-.469-2.423-1.496-.895-.798-1.5-1.784-1.676-2.085-.176-.301-.019-.464.132-.614.136-.135.301-.351.452-.526.15-.175.2-.301.301-.501.101-.2.05-.376-.025-.526-.075-.15-.677-1.63-.928-2.232-.244-.587-.492-.507-.677-.517-.175-.01-.376-.01-.577-.01s-.526.075-.802.376c-.276.301-1.053 1.028-1.053 2.508s1.078 2.909 1.229 3.11c.15.2 2.122 3.24 5.141 4.544.718.31 1.279.495 1.716.634.721.23 1.377.197 1.895.12.578-.087 1.78-.727 2.03-1.43.25-.702.25-1.304.175-1.43-.075-.125-.276-.2-.577-.35zM12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.982-1.411A9.957 9.957 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z" />
+  </svg>
+);
+
+const LinkedInIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+    <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 8.76a1.64 1.64 0 1 0 0-3.28 1.64 1.64 0 0 0 0 3.28m1.4 9.74v-8.37H5.06v8.37h2.8z" />
+  </svg>
+);
+
+const GlobeIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <circle cx="12" cy="12" r="10" />
+    <line x1="2" x2="22" y1="12" y2="12" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+  </svg>
+);
+
 const Footer = () => {
   const year = new Date().getFullYear();
   const [settings, setSettings] = useState<any>(null);
+  const [socials, setSocials] = useState<SocialLinksConfig>(() => getStoredSocialLinks());
 
   useEffect(() => {
     async function loadFooter() {
@@ -44,39 +78,88 @@ const Footer = () => {
         if (data) {
           setSettings(data);
         }
+        const liveSocials = await fetchRemoteSocialLinks();
+        if (liveSocials) {
+          setSocials(liveSocials);
+        }
       } catch (err) {
-        console.error("Failed to load footer settings:", err);
+        console.error("Failed to fetch settings for footer:", err);
       }
     }
     loadFooter();
+
+    // Listen to real-time sync events from Admin Panel
+    const handleSocialsChange = (e: any) => {
+      if (e?.detail) {
+        setSocials(e.detail);
+      } else {
+        setSocials(getStoredSocialLinks());
+      }
+    };
+
+    window.addEventListener("empirial-socials-updated", handleSocialsChange as EventListener);
+    window.addEventListener("storage", handleSocialsChange as EventListener);
+
+    return () => {
+      window.removeEventListener("empirial-socials-updated", handleSocialsChange as EventListener);
+      window.removeEventListener("storage", handleSocialsChange as EventListener);
+    };
   }, []);
 
   const brandName = settings?.brandName || settings?.footer?.brandName || "EMPIRIAL";
   const tagline = settings?.tagline || settings?.footer?.tagline || "Prop Trading Intelligence & Evaluation Platform.";
   const copyrightText = settings?.copyrightText || settings?.footer?.copyrightText || `© ${year} ${brandName}. All rights reserved.`;
 
-  const socialLinks = [
-    {
-      name: "Instagram",
-      href: settings?.instagramUrl || "https://www.instagram.com/anuraj_fx",
-      icon: InstagramIcon,
-    },
-    {
-      name: "X",
-      href: settings?.twitterUrl || settings?.xUrl || "https://x.com/anuraj_fx",
-      icon: XIcon,
-    },
-    {
-      name: "Discord",
-      href: settings?.discordUrl || settings?.contactPage?.discordUrl || "https://discord.gg/ww4dkeeZdp",
-      icon: DiscordIcon,
-    },
-    {
-      name: "YouTube",
-      href: settings?.youtubeUrl || "https://www.youtube.com/@jaat_anuraj_fx",
-      icon: YouTubeIcon,
-    },
-  ];
+  // Dynamically assemble active social links from synced store & settings
+  const dynamicSocialLinks: { name: string; href: string; icon: React.ComponentType<any> }[] = [];
+
+  const discordHref = socials.discordUrl || settings?.discordUrl || settings?.contactPage?.discordUrl;
+  if (discordHref) {
+    dynamicSocialLinks.push({ name: "Discord", href: discordHref, icon: DiscordIcon });
+  }
+
+  const twitterHref = socials.twitterUrl || settings?.twitterUrl || settings?.xUrl;
+  if (twitterHref) {
+    dynamicSocialLinks.push({ name: "X", href: twitterHref, icon: XIcon });
+  }
+
+  const telegramHref = socials.telegramUrl || settings?.telegramUrl;
+  if (telegramHref) {
+    dynamicSocialLinks.push({ name: "Telegram", href: telegramHref, icon: TelegramIcon });
+  }
+
+  const youtubeHref = socials.youtubeUrl || settings?.youtubeUrl;
+  if (youtubeHref) {
+    dynamicSocialLinks.push({ name: "YouTube", href: youtubeHref, icon: YouTubeIcon });
+  }
+
+  const instagramHref = socials.instagramUrl || settings?.instagramUrl;
+  if (instagramHref) {
+    dynamicSocialLinks.push({ name: "Instagram", href: instagramHref, icon: InstagramIcon });
+  }
+
+  const whatsappHref = socials.whatsappUrl || settings?.whatsappUrl;
+  if (whatsappHref) {
+    dynamicSocialLinks.push({ name: "WhatsApp", href: whatsappHref, icon: WhatsAppIcon });
+  }
+
+  const linkedinHref = socials.linkedinUrl || settings?.linkedinUrl;
+  if (linkedinHref) {
+    dynamicSocialLinks.push({ name: "LinkedIn", href: linkedinHref, icon: LinkedInIcon });
+  }
+
+  // Include custom social links added in Admin
+  if (socials.customLinks && Array.isArray(socials.customLinks)) {
+    socials.customLinks.forEach((c) => {
+      if (c.enabled && c.url) {
+        dynamicSocialLinks.push({
+          name: c.name || "Community",
+          href: c.url,
+          icon: GlobeIcon,
+        });
+      }
+    });
+  }
 
   const footerLinks = [
     { name: "About Us", href: "/about" },
@@ -121,21 +204,22 @@ const Footer = () => {
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold">Social</h3>
+              <h3 className="text-sm font-semibold">Official Socials</h3>
               <div className="flex flex-wrap gap-2">
-                {socialLinks.map((social) => (
+                {dynamicSocialLinks.map((social) => (
                   <Button
                     key={social.name}
                     asChild
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground"
+                    className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                   >
                     <Link
                       href={social.href}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={social.name}
+                      title={social.name}
                     >
                       <social.icon className="h-4 w-4" />
                     </Link>

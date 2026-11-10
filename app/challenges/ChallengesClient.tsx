@@ -629,7 +629,22 @@ export function ChallengesClient() {
             <div className="space-y-3.5">
               <AnimatePresence mode="popLayout">
                 {processedChallenges.length > 0 ? (
-                  processedChallenges.map((ch, idx) => {
+                  processedChallenges.flatMap((ch, idx) => {
+                    const elements = [];
+                    if (idx > 0 && idx % 6 === 0) {
+                      elements.push(
+                        <motion.div
+                          key={`ad-challenge-${idx}`}
+                          layout="position"
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -2 }}
+                        >
+                          <InFeedAdCard variant="challenge" />
+                        </motion.div>
+                      );
+                    }
+
                     const isHovered = hoveredChallengeId === ch.id;
                     const isExpanded = expandedChallengeId === ch.id || isHovered;
                     const hasCopied = hasCopiedCodes[ch.id];
@@ -678,26 +693,23 @@ export function ChallengesClient() {
                     const ratingVal = firmMetrics.rating;
                     const reviewCountVal = firmMetrics.reviewCount;
 
-                    return (
-                      <React.Fragment key={ch.id}>
-                        {idx > 0 && idx % 6 === 0 && (
-                          <InFeedAdCard variant="challenge" />
-                        )}
-                        <motion.div
-                          layout="position"
-                          initial={{ opacity: 0, y: 4 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -2, transition: { duration: 0.15 } }}
-                          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                          onMouseEnter={() => handleMouseEnterChallenge(ch.id)}
-                          onMouseLeave={handleMouseLeaveChallenge}
-                          onClick={() => setExpandedChallengeId(expandedChallengeId === ch.id ? null : ch.id)}
-                          className={`relative rounded-2xl transition-all duration-500 ease-in-out border cursor-pointer ${
-                            isExpanded
-                              ? 'border-black dark:border-white shadow-[0_0_20px_rgba(0,0,0,0.12)] dark:shadow-[0_0_25px_rgba(255,255,255,0.16)] bg-white/65 dark:bg-card backdrop-blur-md'
-                              : 'border-zinc-200/80 dark:border-border hover:border-black dark:hover:border-white hover:shadow-[0_0_18px_rgba(0,0,0,0.10)] dark:hover:shadow-[0_0_22px_rgba(255,255,255,0.14)] bg-white/60 dark:bg-card backdrop-blur-md'
-                          }`}
-                        >
+                    elements.push(
+                      <motion.div
+                        key={ch.id}
+                        layout="position"
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -2, transition: { duration: 0.15 } }}
+                        transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                        onMouseEnter={() => handleMouseEnterChallenge(ch.id)}
+                        onMouseLeave={handleMouseLeaveChallenge}
+                        onClick={() => setExpandedChallengeId(expandedChallengeId === ch.id ? null : ch.id)}
+                        className={`relative rounded-2xl transition-all duration-500 ease-in-out border cursor-pointer ${
+                          isExpanded
+                            ? 'border-black dark:border-white shadow-[0_0_20px_rgba(0,0,0,0.12)] dark:shadow-[0_0_25px_rgba(255,255,255,0.16)] bg-white/65 dark:bg-card backdrop-blur-md'
+                            : 'border-zinc-200/80 dark:border-border hover:border-black dark:hover:border-white hover:shadow-[0_0_18px_rgba(0,0,0,0.10)] dark:hover:shadow-[0_0_22px_rgba(255,255,255,0.14)] bg-white/60 dark:bg-card backdrop-blur-md'
+                        }`}
+                      >
                         {/* Main Row Content */}
                         <div className="p-4 sm:p-5">
                           {/* Desktop View */}
@@ -1047,8 +1059,8 @@ export function ChallengesClient() {
                           )}
                         </AnimatePresence>
                       </motion.div>
-                    </React.Fragment>
-                  );
+                    );
+                    return elements;
                   })
                 ) : (
                   <motion.div

@@ -26,6 +26,11 @@ import {
   Clock,
   Play,
   RotateCcw,
+  Smartphone,
+  Monitor,
+  Sun,
+  Moon,
+  Image as ImageIcon,
 } from 'lucide-react';
 import {
   AdvertisementConfig,
@@ -44,7 +49,6 @@ import { Firm } from '@/lib/types';
 import { HomepageSpotlightCard } from '@/components/ads/homepage-spotlight-card';
 import { SparkleToastAd } from '@/components/ads/sparkle-toast-ad';
 import { InFeedAdCard } from '@/components/ads/in-feed-ad-card';
-import { Smartphone, Monitor } from 'lucide-react';
 
 const GRAPHIC_ICON_OPTIONS: { id: AdGraphicIcon; label: string; icon: React.ComponentType<any> }[] = [
   { id: 'sparkles', label: 'Sparkles', icon: Sparkles },
@@ -56,11 +60,20 @@ const GRAPHIC_ICON_OPTIONS: { id: AdGraphicIcon; label: string; icon: React.Comp
   { id: 'zap', label: 'Lightning', icon: Zap },
 ];
 
+const BACKDROP_PRESETS = [
+  { id: 'trident-head', label: '🔱 Trident Head (Clean Prongs)', url: '/images/ads/lucid-trident-head.png' },
+  { id: 'trident-emblem', label: '🔱 Trident Emblem (Square)', url: '/images/ads/lucid-trident-emblem.png' },
+  { id: 'trident-full', label: '🔱 Full Trident (Wide Shaft)', url: '/images/ads/lucid-trident-bg.png' },
+  { id: 'frosted', label: '✨ Lucid Glass 3D', url: '/images/ads/lucid-glass-bg.jpg' },
+  { id: 'none', label: 'Pure Glass (No Art)', url: '' },
+];
+
 export default function AdminAdvertisementsPage() {
   const [firms, setFirms] = useState<Firm[]>([]);
   const [config, setConfig] = useState<AdvertisementConfig>(DEFAULT_AD_CONFIG);
-  const [activeTab, setActiveTab] = useState<'preview-card' | 'preview-toast' | 'preview-infeed'>('preview-card');
+  const [activeTab, setActiveTab] = useState<'preview-card' | 'preview-toast' | 'preview-infeed'>('preview-toast');
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
+  const [previewTheme, setPreviewTheme] = useState<'dark' | 'light'>('dark');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -151,10 +164,12 @@ export default function AdminAdvertisementsPage() {
     };
 
     try {
-      // 1. Save to local store & dispatch tab event
+      // 1. Save to local store & dispatch custom event immediately
       saveStoredAdConfig(updated);
-      // 2. Sync to Firestore siteSettings
-      await updateAdvertisement(updated);
+      // 2. Sync to Firestore siteSettings in background
+      updateAdvertisement(updated).catch((err) => {
+        console.warn('Background Firestore sync encountered error:', err);
+      });
 
       setSaveSuccess('✓ Advertisement settings published and synchronized across the live website.');
       setToastReplayCount((c) => c + 1);
@@ -167,7 +182,7 @@ export default function AdminAdvertisementsPage() {
   };
 
   return (
-    <div className="space-y-8 pb-20">
+    <div className="space-y-8 pb-20 font-sans">
       {/* Page Header */}
       <div className="border-b border-zinc-200 dark:border-zinc-800 pb-5 space-y-1">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -180,27 +195,25 @@ export default function AdminAdvertisementsPage() {
                 Advertisements &amp; Spotlight Engine
               </h1>
             </div>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-              Customize promotional spotlight cards, sliding sparkle toasts, firm discount codes, and rule announcements across the website.
+            <p className="text-muted-foreground text-xs sm:text-sm mt-1">
+              Lucid Glass translucent ads with White Theme + Dark Theme support, 14-star sparkle physics, and chatbox collision avoidance.
             </p>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Global Master Enable/Disable Switch */}
-            <label className="flex items-center gap-2 cursor-pointer bg-zinc-100 dark:bg-zinc-900 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-semibold">
-              <input
-                type="checkbox"
-                checked={config.enabled}
-                onChange={(e) => setConfig((p) => ({ ...p, enabled: e.target.checked }))}
-                className="rounded accent-black dark:accent-white"
-              />
-              <span>{config.enabled ? 'Ads Active' : 'Ads Disabled'}</span>
-            </label>
+            <Link
+              href="/challenges"
+              target="_blank"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-card text-foreground hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs font-medium transition-colors"
+            >
+              <span>View Challenges Grid</span>
+              <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
+            </Link>
 
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-semibold transition-colors disabled:opacity-50 shadow-xs"
+              className="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-xl bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-semibold transition-colors disabled:opacity-50 shadow-xs cursor-pointer"
             >
               {isSaving ? (
                 <>
@@ -260,7 +273,7 @@ export default function AdminAdvertisementsPage() {
                 key={item.id}
                 type="button"
                 onClick={() => handleSelectTemplate(item.id as AdvertisementTemplate)}
-                className={`p-3 rounded-xl border text-left transition-colors flex flex-col justify-between space-y-2 ${
+                className={`p-3 rounded-xl border text-left transition-colors flex flex-col justify-between space-y-2 cursor-pointer ${
                   isSelected
                     ? 'bg-zinc-900 text-white dark:bg-white dark:text-black border-zinc-900 dark:border-white shadow-xs'
                     : 'bg-zinc-50 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 text-muted-foreground hover:text-foreground'
@@ -281,14 +294,157 @@ export default function AdminAdvertisementsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Configuration Controls (7 cols) */}
         <div className="lg:col-span-7 space-y-6">
-          {/* Section 1: Target Firm & Visual Identity */}
+          {/* Section 1: Lucid Glass Background & Frosted Settings */}
+          <div className="bg-white dark:bg-card border border-zinc-200 dark:border-border rounded-2xl p-5 shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-foreground" />
+                <h3 className="text-sm font-bold text-foreground">Lucid Glass Artwork &amp; Translucency</h3>
+              </div>
+              <span className="text-[11px] font-mono text-muted-foreground">Glassmorphism</span>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div className="space-y-1.5">
+                <label className="text-muted-foreground font-semibold">Backdrop Graphic Preset</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {BACKDROP_PRESETS.map((bp) => {
+                    const isSelected = (config.backgroundImageUrl || '') === bp.url;
+                    return (
+                      <button
+                        key={bp.id}
+                        type="button"
+                        onClick={() => setConfig((p) => ({ ...p, backgroundImageUrl: bp.url }))}
+                        className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer font-semibold ${
+                          isSelected
+                            ? 'bg-black text-white dark:bg-white dark:text-black border-black dark:border-white shadow-xs'
+                            : 'bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        {bp.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-muted-foreground font-semibold">Custom Background Image URL</label>
+                  <input
+                    type="text"
+                    value={config.backgroundImageUrl || ''}
+                    onChange={(e) => setConfig((p) => ({ ...p, backgroundImageUrl: e.target.value }))}
+                    placeholder="/images/ads/lucid-trident-bg.png"
+                    className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground font-mono text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-muted-foreground font-semibold">Glass Artwork Opacity</label>
+                    <span className="font-mono text-foreground font-bold">{config.glassOpacity ?? 20}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="5"
+                    max="50"
+                    step="1"
+                    value={config.glassOpacity ?? 20}
+                    onChange={(e) => setConfig((p) => ({ ...p, glassOpacity: Number(e.target.value) }))}
+                    className="w-full accent-black dark:accent-white cursor-pointer mt-2"
+                  />
+                  <div className="flex justify-between text-[10px] text-muted-foreground">
+                    <span>5% (Subtle)</span>
+                    <span>20% (Recommended)</span>
+                    <span>50% (High Depth)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Background Alignment & Masking Adjustment */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                <div className="space-y-1.5">
+                  <label className="text-muted-foreground font-semibold">Watermark / Art Alignment</label>
+                  <select
+                    value={config.backgroundPosition || 'watermark-right'}
+                    onChange={(e) => setConfig((p) => ({ ...p, backgroundPosition: e.target.value as any }))}
+                    className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground"
+                  >
+                    <option value="watermark-right">Right Watermark (Recommended — Clean Text)</option>
+                    <option value="watermark-center">Centered Watermark</option>
+                    <option value="cover">Full Cover Texture</option>
+                  </select>
+                  <p className="text-[10px] text-muted-foreground">
+                    Prevents the trident or graphic from bisecting headline copy.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5 flex flex-col justify-end">
+                  <label className="flex items-center gap-2 p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={config.backgroundMaskFade !== false}
+                      onChange={(e) => setConfig((p) => ({ ...p, backgroundMaskFade: e.target.checked }))}
+                      className="rounded accent-black dark:accent-white w-4 h-4 cursor-pointer"
+                    />
+                    <div>
+                      <span className="font-semibold text-foreground text-xs block">
+                        Soft Gradient Mask Fade
+                      </span>
+                      <span className="text-[10px] text-muted-foreground block">
+                        Fades artwork towards text so badges and headlines never get crossed
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: Target Firm & Visual Identity */}
           <div className="bg-white dark:bg-card border border-zinc-200 dark:border-border rounded-2xl p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
               <div className="flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-foreground" />
-                <h3 className="text-sm font-bold text-foreground">Target Firm &amp; Graphic</h3>
+                <h3 className="text-sm font-bold text-foreground">Target Firm &amp; Graphic Icon</h3>
               </div>
               <span className="text-[11px] font-mono text-muted-foreground">Identity</span>
+            </div>
+
+            {/* Quick Logo Mode Selector */}
+            <div className="flex items-center gap-2 p-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs">
+              <button
+                type="button"
+                onClick={() =>
+                  setConfig((p) => ({
+                    ...p,
+                    useEmpirialLogo: true,
+                    firmName: p.firmName === 'EMPIRIAL' ? p.firmName : 'EMPIRIAL',
+                    logoUrl: '/logos/empirial-trident-dark.png',
+                  }))
+                }
+                className={`flex-1 py-1.5 px-3 rounded-lg font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  config.useEmpirialLogo
+                    ? 'bg-black text-white dark:bg-white dark:text-black shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <span>🔱 Use Official EMPIRIAL Logo</span>
+                {config.useEmpirialLogo && <Check className="w-3.5 h-3.5" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfig((p) => ({ ...p, useEmpirialLogo: false }))}
+                className={`flex-1 py-1.5 px-3 rounded-lg font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  !config.useEmpirialLogo
+                    ? 'bg-black text-white dark:bg-white dark:text-black shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <span>🏢 Custom / Firm Partner Logo</span>
+                {!config.useEmpirialLogo && <Check className="w-3.5 h-3.5" />}
+              </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -316,8 +472,7 @@ export default function AdminAdvertisementsPage() {
                   onChange={(e) => setConfig((p) => ({ ...p, firmName: e.target.value }))}
                   placeholder="e.g. Velotrade"
                   className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground"
-                >
-                </input>
+                />
               </div>
 
               <div className="space-y-1.5">
@@ -332,7 +487,7 @@ export default function AdminAdvertisementsPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-muted-foreground font-semibold">Or Pick Fallback Graphic Icon</label>
+                <label className="text-muted-foreground font-semibold">Fallback Graphic Icon</label>
                 <div className="flex items-center gap-1.5 overflow-x-auto py-1">
                   {GRAPHIC_ICON_OPTIONS.map((g) => {
                     const GIcon = g.icon;
@@ -342,9 +497,9 @@ export default function AdminAdvertisementsPage() {
                         type="button"
                         onClick={() => setConfig((p) => ({ ...p, graphicIcon: g.id }))}
                         title={g.label}
-                        className={`p-2 rounded-lg border transition-colors ${
+                        className={`p-2 rounded-lg border transition-colors cursor-pointer ${
                           config.graphicIcon === g.id
-                            ? 'bg-black text-white dark:bg-white dark:text-black border-transparent'
+                            ? 'bg-black text-white dark:bg-white dark:text-black border-transparent shadow-xs'
                             : 'border-zinc-200 dark:border-zinc-800 text-muted-foreground hover:text-foreground'
                         }`}
                       >
@@ -357,7 +512,7 @@ export default function AdminAdvertisementsPage() {
             </div>
           </div>
 
-          {/* Section 2: Headings, Badge & Coupon Text */}
+          {/* Section 3: Headings, Badge & Coupon Text */}
           <div className="bg-white dark:bg-card border border-zinc-200 dark:border-border rounded-2xl p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
               <div className="flex items-center gap-2">
@@ -455,7 +610,7 @@ export default function AdminAdvertisementsPage() {
                 <button
                   type="button"
                   onClick={handleAddBenefit}
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-foreground hover:underline"
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-foreground hover:underline cursor-pointer"
                 >
                   <Plus className="w-3 h-3" /> Add Highlight
                 </button>
@@ -473,7 +628,7 @@ export default function AdminAdvertisementsPage() {
                     <button
                       type="button"
                       onClick={() => handleDeleteBenefit(idx)}
-                      className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
+                      className="p-2 text-zinc-400 hover:text-red-500 transition-colors cursor-pointer"
                       title="Remove"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -484,7 +639,7 @@ export default function AdminAdvertisementsPage() {
             </div>
           </div>
 
-          {/* Section 3: Behavior & Sparkle Animation Controls */}
+          {/* Section 4: Behavior & Sparkle Animation Controls */}
           <div className="bg-white dark:bg-card border border-zinc-200 dark:border-border rounded-2xl p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
               <div className="flex items-center gap-2">
@@ -503,14 +658,14 @@ export default function AdminAdvertisementsPage() {
                     Sparkle Stars Burst
                   </p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
-                    YouTube/Instagram like star particles burst on slide entrance
+                    14-star perimeter burst framing on slide entrance
                   </p>
                 </div>
                 <input
                   type="checkbox"
                   checked={config.sparkleAnimation}
                   onChange={(e) => setConfig((p) => ({ ...p, sparkleAnimation: e.target.checked }))}
-                  className="rounded accent-black dark:accent-white w-4 h-4"
+                  className="rounded accent-black dark:accent-white w-4 h-4 cursor-pointer"
                 />
               </div>
 
@@ -522,7 +677,7 @@ export default function AdminAdvertisementsPage() {
                   onChange={(e) => setConfig((p) => ({ ...p, toastPosition: e.target.value as any }))}
                   className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-foreground"
                 >
-                  <option value="bottom-right">Bottom-Right Corner</option>
+                  <option value="bottom-right">Bottom-Right (Safely Upside of Chat Button)</option>
                   <option value="bottom-left">Bottom-Left Corner</option>
                 </select>
               </div>
@@ -552,12 +707,11 @@ export default function AdminAdvertisementsPage() {
                 >
                   <option value="minimal">Minimal (6 Stars)</option>
                   <option value="standard">Standard (14 Stars)</option>
-                  <option value="vibrant">Vibrant / Full Burst</option>
                 </select>
               </div>
 
               {/* In-Feed Frequency */}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 sm:col-span-2">
                 <label className="text-muted-foreground font-semibold">In-Feed Grid Frequency</label>
                 <select
                   value={config.inFeedFrequency || 6}
@@ -591,7 +745,7 @@ export default function AdminAdvertisementsPage() {
                     className="rounded accent-black dark:accent-white"
                   />
                   <span className="font-semibold text-foreground">
-                    Show Floating Slide-in Toast with Sparkle Burst
+                    Show Floating Slide-in Notification Toast (Upside of chat button)
                   </span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -619,7 +773,37 @@ export default function AdminAdvertisementsPage() {
                 <h3 className="text-sm font-bold text-foreground">Live Previews</h3>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Theme Mode Switcher (White Theme vs Dark Theme) */}
+                <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewTheme('light')}
+                    title="Preview in White/Light Theme"
+                    className={`p-1.5 rounded transition-colors flex items-center gap-1 ${
+                      previewTheme === 'light'
+                        ? 'bg-white text-black shadow-xs font-semibold'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Sun className="w-3.5 h-3.5 text-amber-500" />
+                    <span className="text-[10px]">White</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewTheme('dark')}
+                    title="Preview in Dark Theme"
+                    className={`p-1.5 rounded transition-colors flex items-center gap-1 ${
+                      previewTheme === 'dark'
+                        ? 'bg-black text-white shadow-xs font-semibold'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Moon className="w-3.5 h-3.5 text-blue-400" />
+                    <span className="text-[10px]">Dark</span>
+                  </button>
+                </div>
+
                 {/* Device Mode Switcher */}
                 <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-[11px]">
                   <button
@@ -652,30 +836,8 @@ export default function AdminAdvertisementsPage() {
                 <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl text-xs">
                   <button
                     type="button"
-                    onClick={() => setActiveTab('preview-card')}
-                    className={`px-2 py-1 rounded-lg font-medium transition-colors ${
-                      activeTab === 'preview-card'
-                        ? 'bg-black text-white dark:bg-white dark:text-black shadow-xs font-semibold'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    Card
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('preview-infeed')}
-                    className={`px-2 py-1 rounded-lg font-medium transition-colors ${
-                      activeTab === 'preview-infeed'
-                        ? 'bg-black text-white dark:bg-white dark:text-black shadow-xs font-semibold'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    In-Feed
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => setActiveTab('preview-toast')}
-                    className={`px-2 py-1 rounded-lg font-medium transition-colors ${
+                    className={`px-2 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
                       activeTab === 'preview-toast'
                         ? 'bg-black text-white dark:bg-white dark:text-black shadow-xs font-semibold'
                         : 'text-muted-foreground hover:text-foreground'
@@ -683,69 +845,102 @@ export default function AdminAdvertisementsPage() {
                   >
                     Toast
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('preview-card')}
+                    className={`px-2 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+                      activeTab === 'preview-card'
+                        ? 'bg-black text-white dark:bg-white dark:text-black shadow-xs font-semibold'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Spotlight
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('preview-infeed')}
+                    className={`px-2 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+                      activeTab === 'preview-infeed'
+                        ? 'bg-black text-white dark:bg-white dark:text-black shadow-xs font-semibold'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    In-Feed
+                  </button>
                 </div>
               </div>
             </div>
 
-            {/* Simulated Device Frame Container */}
-            <div className={`transition-all duration-300 ${previewDevice === 'mobile' ? 'max-w-[340px] mx-auto border-2 border-zinc-700/80 rounded-3xl p-2.5 bg-black shadow-xl' : ''}`}>
-              {/* Preview 1: Homepage In-Between Spotlight Card */}
-              {activeTab === 'preview-card' && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Homepage In-Between Card:</span>
-                    <span className="font-mono text-[10px] uppercase">{previewDevice}</span>
-                  </div>
-                  <div className="rounded-2xl bg-zinc-950 border border-zinc-800 overflow-hidden">
-                    <HomepageSpotlightCard forceConfig={config} />
-                  </div>
-                </div>
-              )}
+            {/* Simulated Device Frame Container with Dark/Light Class Wrapper */}
+            <div className={`transition-all duration-300 ${previewTheme === 'dark' ? 'dark' : ''}`}>
+              <div className={`transition-all duration-300 ${previewDevice === 'mobile' ? 'max-w-[340px] mx-auto border-2 border-zinc-700/80 rounded-3xl p-2.5 bg-zinc-950 shadow-xl' : ''}`}>
+                
+                {/* Preview 1: Notification Slide Toast with Replay Button */}
+                {activeTab === 'preview-toast' && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">
+                        Notification Toast ({previewTheme === 'light' ? 'White Theme' : 'Dark Theme'}):
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setToastReplayCount((c) => c + 1)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-foreground font-semibold text-xs border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Replay</span>
+                      </button>
+                    </div>
 
-              {/* Preview 2: In-Feed Native Card (/challenges & /firms) */}
-              {activeTab === 'preview-infeed' && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>In-Feed Sponsored Grid Card:</span>
-                    <span className="font-mono text-[10px] uppercase">{previewDevice}</span>
+                    <div className={`relative h-64 rounded-2xl border flex items-center justify-center overflow-hidden p-4 transition-colors ${
+                      previewTheme === 'dark' ? 'bg-zinc-950 border-zinc-800' : 'bg-zinc-100 border-zinc-200'
+                    }`}>
+                      {/* Embedded Toast Simulator */}
+                      <SparkleToastAd
+                        key={`${toastReplayCount}-${previewTheme}`}
+                        forcePreviewConfig={config}
+                        triggerPreview={true}
+                      />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground text-center">
+                      Notification slide toast with Lucid Glass frosted depth, 14-star perimeter sparkles, and auto-dismiss.
+                    </p>
                   </div>
-                  <div className="rounded-2xl bg-zinc-950 border border-zinc-800 p-2 overflow-hidden">
-                    <InFeedAdCard forceConfig={config} />
-                  </div>
-                  <p className="text-[11px] text-muted-foreground text-center pt-1">
-                    Appears naturally inside /challenges and /firms after every {config.inFeedFrequency || 6} items.
-                  </p>
-                </div>
-              )}
+                )}
 
-              {/* Preview 3: Corner Slide-in Toast with Test Replay */}
-              {activeTab === 'preview-toast' && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Slide-in Toast Interactive:</span>
-                    <button
-                      type="button"
-                      onClick={() => setToastReplayCount((c) => c + 1)}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-foreground font-semibold text-xs border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
-                    >
-                      <RotateCcw className="w-3 h-3" />
-                      <span>Replay Animation</span>
-                    </button>
+                {/* Preview 2: Homepage In-Between Spotlight Card */}
+                {activeTab === 'preview-card' && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Homepage Spotlight ({previewTheme === 'light' ? 'White Theme' : 'Dark Theme'}):</span>
+                      <span className="font-mono text-[10px] uppercase">{previewDevice}</span>
+                    </div>
+                    <div className={`rounded-2xl border overflow-hidden p-2 transition-colors ${
+                      previewTheme === 'dark' ? 'bg-zinc-950 border-zinc-800' : 'bg-zinc-100 border-zinc-200'
+                    }`}>
+                      <HomepageSpotlightCard forceConfig={config} />
+                    </div>
                   </div>
+                )}
 
-                  <div className="relative h-64 rounded-2xl bg-zinc-950 border border-zinc-800 flex items-center justify-center overflow-hidden p-4">
-                    {/* Embedded Toast Simulator */}
-                    <SparkleToastAd
-                      key={toastReplayCount}
-                      forcePreviewConfig={config}
-                      triggerPreview={true}
-                    />
+                {/* Preview 3: In-Feed Native Card (/challenges & /firms) */}
+                {activeTab === 'preview-infeed' && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>In-Feed Sponsored Grid ({previewTheme === 'light' ? 'White Theme' : 'Dark Theme'}):</span>
+                      <span className="font-mono text-[10px] uppercase">{previewDevice}</span>
+                    </div>
+                    <div className={`rounded-2xl border p-2 overflow-hidden transition-colors ${
+                      previewTheme === 'dark' ? 'bg-zinc-950 border-zinc-800' : 'bg-zinc-100 border-zinc-200'
+                    }`}>
+                      <InFeedAdCard forceConfig={config} />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground text-center pt-1">
+                      Appears naturally inside /challenges and /firms after every {config.inFeedFrequency || 6} items.
+                    </p>
                   </div>
-                  <p className="text-[11px] text-muted-foreground text-center">
-                    Click 'Replay Animation' to test the spring entrance, 14-star perimeter sparkles, and countdown timer.
-                  </p>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -753,4 +948,3 @@ export default function AdminAdvertisementsPage() {
     </div>
   );
 }
-

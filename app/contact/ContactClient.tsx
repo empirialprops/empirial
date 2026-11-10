@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Mail, Send, CheckCircle2, MessageSquare, Phone, ExternalLink, Ticket, MessageCircle, X, Shield, Sparkles } from 'lucide-react';
 import { getStoredUser, openAuthModal, addSupportTicket } from '@/lib/utils/auth-store';
 import { getSiteSettings } from '@/lib/firebase/services';
+import { getStoredSocialLinks, fetchRemoteSocialLinks, SocialLinksConfig } from '@/lib/utils/socials-store';
 
 const DEFAULT_QUERY_CATEGORIES = [
   'Prop Firm Audit Request',
@@ -18,6 +19,7 @@ const DEFAULT_QUERY_CATEGORIES = [
 export function ContactClient() {
   const router = useRouter();
   const [settings, setSettings] = useState<any>(null);
+  const [socials, setSocials] = useState<SocialLinksConfig>(getStoredSocialLinks);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [subject, setSubject] = useState('');
@@ -25,15 +27,34 @@ export function ContactClient() {
   const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
+    // 1. Load local social links immediately
+    setSocials(getStoredSocialLinks());
+
+    // 2. Fetch remote site settings and social links in background
     async function loadData() {
       try {
-        const data = await getSiteSettings();
-        if (data) setSettings(data);
+        const [settingsData, remoteSocials] = await Promise.all([
+          getSiteSettings().catch(() => null),
+          fetchRemoteSocialLinks().catch(() => null),
+        ]);
+        if (settingsData) setSettings(settingsData);
+        if (remoteSocials) setSocials(remoteSocials);
       } catch (err) {
         console.error('Failed to load settings on Contact page:', err);
       }
     }
     loadData();
+
+    // 3. Reactively update whenever admin saves socials in another tab or panel
+    const handleSocialUpdate = (e: any) => {
+      if (e.detail) {
+        setSocials(e.detail);
+      } else {
+        setSocials(getStoredSocialLinks());
+      }
+    };
+    window.addEventListener('empirial-socials-updated', handleSocialUpdate);
+    return () => window.removeEventListener('empirial-socials-updated', handleSocialUpdate);
   }, []);
 
   const contactData = settings?.contactPage || {};
@@ -41,8 +62,8 @@ export function ContactClient() {
   const pageSubtitle = contactData.subtitle || 'Have an inquiry, partnership proposal, or want your prop firm audited? Reach out directly to our team through any of our official channels.';
   const emailAddr = contactData.email || settings?.contactEmail || 'support@empirialprops.com';
   const whatsappNum = contactData.whatsapp || '+1 (555) 890-EMPIRE';
-  const whatsappLink = contactData.whatsappLink || 'https://wa.me/15558903674';
-  const discordUrl = contactData.discordUrl || settings?.discordUrl || 'https://discord.gg/ww4dkeeZdp';
+  const whatsappLink = socials.whatsappUrl || contactData.whatsappLink || 'https://wa.me/15558903674';
+  const discordUrl = socials.discordUrl || contactData.discordUrl || settings?.discordUrl || 'https://discord.gg/ww4dkeeZdp';
 
   const queryCategories = (contactData.queryCategories && contactData.queryCategories.length > 0)
     ? contactData.queryCategories
@@ -202,6 +223,105 @@ export function ContactClient() {
             <MessageCircle className="w-3.5 h-3.5" />
             <span>Start Live Chat</span>
           </Link>
+        </div>
+      </div>
+
+      {/* Official Social Channels Strip */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Official Channels</div>
+          <div className="text-sm font-semibold text-foreground">Follow & sync with EMPIRIAL on official platforms</div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {socials.discordUrl && (
+            <a
+              href={socials.discordUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-card text-foreground hover:border-black dark:hover:border-white text-xs font-medium transition-colors"
+            >
+              <span>Discord</span>
+              <ExternalLink className="w-3 h-3 opacity-60" />
+            </a>
+          )}
+          {socials.twitterUrl && (
+            <a
+              href={socials.twitterUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-card text-foreground hover:border-black dark:hover:border-white text-xs font-medium transition-colors"
+            >
+              <span>X (Twitter)</span>
+              <ExternalLink className="w-3 h-3 opacity-60" />
+            </a>
+          )}
+          {socials.telegramUrl && (
+            <a
+              href={socials.telegramUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-card text-foreground hover:border-black dark:hover:border-white text-xs font-medium transition-colors"
+            >
+              <span>Telegram</span>
+              <ExternalLink className="w-3 h-3 opacity-60" />
+            </a>
+          )}
+          {socials.youtubeUrl && (
+            <a
+              href={socials.youtubeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-card text-foreground hover:border-black dark:hover:border-white text-xs font-medium transition-colors"
+            >
+              <span>YouTube</span>
+              <ExternalLink className="w-3 h-3 opacity-60" />
+            </a>
+          )}
+          {socials.instagramUrl && (
+            <a
+              href={socials.instagramUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-card text-foreground hover:border-black dark:hover:border-white text-xs font-medium transition-colors"
+            >
+              <span>Instagram</span>
+              <ExternalLink className="w-3 h-3 opacity-60" />
+            </a>
+          )}
+          {socials.whatsappUrl && (
+            <a
+              href={socials.whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-card text-foreground hover:border-black dark:hover:border-white text-xs font-medium transition-colors"
+            >
+              <span>WhatsApp</span>
+              <ExternalLink className="w-3 h-3 opacity-60" />
+            </a>
+          )}
+          {socials.linkedinUrl && (
+            <a
+              href={socials.linkedinUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-card text-foreground hover:border-black dark:hover:border-white text-xs font-medium transition-colors"
+            >
+              <span>LinkedIn</span>
+              <ExternalLink className="w-3 h-3 opacity-60" />
+            </a>
+          )}
+          {socials.customLinks && socials.customLinks.filter(l => l.enabled).map(link => (
+            <a
+              key={link.id}
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-card text-foreground hover:border-black dark:hover:border-white text-xs font-medium transition-colors"
+            >
+              <span>{link.name}</span>
+              <ExternalLink className="w-3 h-3 opacity-60" />
+            </a>
+          ))}
         </div>
       </div>
 
