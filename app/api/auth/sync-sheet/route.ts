@@ -46,7 +46,8 @@ export async function POST(req: NextRequest) {
       emailVerified: body.emailVerified ?? false,
       phone: body.phone || 'N/A',
       provider: body.provider || 'password',
-      role: body.role || (body.email.includes('admin') ? 'admin' : 'trader'),
+      // Fix: Never assign admin privileges based on substring in email
+      role: body.role || 'trader',
       points: body.points || 500,
       disabled: body.disabled ?? false,
       createdAt: body.createdAt || new Date().toISOString(),

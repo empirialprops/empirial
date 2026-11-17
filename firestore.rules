@@ -1,8 +1,127 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // Auth Helpers
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isUser(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.is_active == true
+      );
+    }
+
+    // Public Read-Only Content (Admin Write Only)
+    match /firms/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /challenges/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /deals/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /brokerSpreads/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /events/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /awards/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /communityPosts/{id} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.author_id == request.auth.uid);
+    }
+
+    match /reviews/{id} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.user_id == request.auth.uid);
+    }
+
+    match /loyaltyRewards/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /marketTickers/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /blogPosts/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /advertisements/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /siteSettings/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // User Accounts
+    match /users/{userId} {
+      allow read: if isUser(userId) || isAdmin();
+      allow create: if isUser(userId);
+      // Users can update non-privileged fields; role and point changes require admin
+      allow update: if (isUser(userId) && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'points', 'disabled']))) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Administrators
+    match /admins/{adminId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Support Tickets
+    match /supportTickets/{ticketId} {
+      allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.user_id == request.auth.uid);
+    }
+
+    // Referral Visitors
+    match /referralVisitors/{visitorId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Audit Logs
+    match /auditLogs/{logId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Default Fallback
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if isAdmin();
     }
   }
 }

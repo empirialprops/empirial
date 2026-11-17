@@ -3,14 +3,14 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, collection, getDocs } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCe9uxipeZcMDbMMMc2h4j7EuaADRfO7Dc",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "goal-planner-3802e.firebaseapp.com",
-  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || "https://goal-planner-3802e-default-rtdb.firebaseio.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "goal-planner-3802e",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "goal-planner-3802e.firebasestorage.app",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "848052161618",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:848052161618:web:68450bf3b90ea3f789238b",
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-B9P8R3PHCB"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
@@ -18,6 +18,18 @@ const db = getFirestore(app);
 
 export async function POST(req: NextRequest) {
   try {
+    // 1. Authorization check: Require Bearer secret or admin key
+    const authHeader = req.headers.get('authorization') || '';
+    const adminKey = req.headers.get('x-admin-sync-key') || '';
+    const syncSecret = process.env.ADMIN_SYNC_SECRET;
+
+    if (syncSecret) {
+      const providedSecret = authHeader.replace(/^Bearer\s+/i, '') || adminKey;
+      if (providedSecret !== syncSecret) {
+        return NextResponse.json({ error: 'Unauthorized: Invalid administrative sync credentials' }, { status: 401 });
+      }
+    }
+
     const webhookUrl =
       process.env.GOOGLE_SHEETS_WEBHOOK_URL ||
       process.env.NEXT_PUBLIC_GOOGLE_SHEETS_WEBHOOK_URL ||
@@ -41,7 +53,8 @@ export async function POST(req: NextRequest) {
         emailVerified: u.emailVerified !== undefined ? u.emailVerified : (existing.emailVerified ?? false),
         phone: u.phone || u.phoneNumber || existing.phone || 'N/A',
         provider: u.provider || existing.provider || (u.email?.includes('gmail') ? 'google.com' : 'password'),
-        role: u.role || existing.role || (u.email?.includes('admin') ? 'admin' : 'trader'),
+        // Fix: Do not grant admin role based on substring matching in email addresses
+        role: u.role || existing.role || 'trader',
         points: u.points !== undefined ? u.points : (existing.points ?? 500),
         disabled: u.disabled !== undefined ? u.disabled : (existing.disabled ?? false),
         createdAt: u.createdAt || u.created_at || existing.createdAt || new Date().toISOString(),
