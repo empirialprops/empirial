@@ -1,0 +1,9 @@
+<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g class="empirial-trident-logo">
+    <rect x="20" y="14" width="14" height="72" rx="4" fill="currentColor"/>
+    <path d="M 34 14 L 76 14 C 80 14 82 17 80 20 L 72 30 L 64 24 L 34 24 Z" fill="currentColor"/>
+    <path d="M 34 43 L 68 43 L 88 50 L 68 57 L 34 57 Z" fill="currentColor"/>
+    <path d="M 34 76 L 64 76 L 72 70 L 80 80 C 82 83 80 86 76 86 L 34 86 Z" fill="currentColor"/>
+    <line x1="52" y1="14" x2="52" y2="86" stroke="currentColor" stroke-width="2" opacity="0.3"/>
+  </g>
+</svg>

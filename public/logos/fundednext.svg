@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 48" fill="none">
+  <rect width="160" height="48" rx="8" fill="#0C1222"/>
+  <circle cx="26" cy="24" r="10" fill="#8B5CF6"/>
+  <path d="M22 24H30M26 20L30 24L26 28" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="44" y="28" fill="#FFFFFF" font-family="system-ui, sans-serif" font-size="13" font-weight="800">FundedNext</text>
+</svg>

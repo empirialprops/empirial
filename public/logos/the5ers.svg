@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 48" fill="none">
+  <rect width="160" height="48" rx="8" fill="#0D1117"/>
+  <rect x="18" y="14" width="20" height="20" rx="4" fill="#E11D48"/>
+  <text x="24" y="29" fill="#FFFFFF" font-family="system-ui, sans-serif" font-size="14" font-weight="900">5</text>
+  <text x="46" y="29" fill="#FFFFFF" font-family="system-ui, sans-serif" font-size="14" font-weight="800">The5%ers</text>
+</svg>

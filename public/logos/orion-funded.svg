@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="orionGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#000000" />
+      <stop offset="100%" stop-color="#18181b" />
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#A1A1AA" />
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" rx="44" fill="url(#orionGrad)" />
+  <circle cx="100" cy="100" r="62" fill="none" stroke="url(#goldGrad)" stroke-width="9" />
+  <!-- Central Orion constellation compass stars -->
+  <polygon points="100,56 109,91 144,100 109,109 100,144 91,109 56,100 91,91" fill="#FFFFFF" />
+  <circle cx="100" cy="100" r="4" fill="#09090b" />
+  <!-- Orbital accent dots -->
+  <circle cx="100" cy="42" r="3.5" fill="#FFFFFF" opacity="0.8" />
+  <circle cx="158" cy="100" r="3.5" fill="#FFFFFF" opacity="0.8" />
+  <circle cx="100" cy="158" r="3.5" fill="#FFFFFF" opacity="0.8" />
+  <circle cx="42" cy="100" r="3.5" fill="#FFFFFF" opacity="0.8" />
+</svg>

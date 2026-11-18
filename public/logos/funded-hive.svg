@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0a0c" />
+      <stop offset="100%" stop-color="#18181b" />
+    </linearGradient>
+    <linearGradient id="hiveGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="50%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+    <linearGradient id="glowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#a1a1aa" stop-opacity="0.6" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background container -->
+  <rect width="200" height="200" rx="44" fill="url(#bgGrad)" stroke="#27272a" stroke-width="2" />
+
+  <!-- Outer Hexagon Hive Border -->
+  <polygon points="100,28 158,62 158,138 100,172 42,138 42,62" 
+           fill="none" 
+           stroke="url(#hiveGrad)" 
+           stroke-width="5" 
+           stroke-linejoin="round" />
+
+  <!-- Inner Hexagon Cell -->
+  <polygon points="100,46 142,70 142,130 100,154 58,130 58,70" 
+           fill="#1c1917" 
+           stroke="url(#glowGrad)" 
+           stroke-width="2.5" 
+           stroke-linejoin="round" />
+
+  <!-- Central Hive Grid Core -->
+  <!-- Top Center Hex -->
+  <polygon points="100,60 118,70 118,92 100,102 82,92 82,70" 
+           fill="url(#hiveGrad)" 
+           stroke="#000000" 
+           stroke-width="2" />
+
+  <!-- Bottom Left Hex -->
+  <polygon points="80,95 98,105 98,127 80,137 62,127 62,105" 
+           fill="url(#hiveGrad)" 
+           stroke="#000000" 
+           stroke-width="2" opacity="0.9" />
+
+  <!-- Bottom Right Hex -->
+  <polygon points="120,95 138,105 138,127 120,137 102,127 102,105" 
+           fill="url(#hiveGrad)" 
+           stroke="#000000" 
+           stroke-width="2" opacity="0.9" />
+
+  <!-- Central Connecting Tech Node -->
+  <circle cx="100" cy="100" r="5" fill="#ffffff" />
+  <circle cx="100" cy="100" r="2.5" fill="#000000" />
+
+  <!-- Tech Dots / Blockchain Nodes on Hex Vertices -->
+  <circle cx="100" cy="28" r="3.5" fill="#fbbf24" />
+  <circle cx="158" cy="62" r="3.5" fill="#fbbf24" />
+  <circle cx="158" cy="138" r="3.5" fill="#fbbf24" />
+  <circle cx="100" cy="172" r="3.5" fill="#fbbf24" />
+  <circle cx="42" cy="138" r="3.5" fill="#fbbf24" />
+  <circle cx="42" cy="62" r="3.5" fill="#fbbf24" />
+</svg>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 48" fill="none">
+  <rect width="160" height="48" rx="8" fill="#18181B"/>
+  <path d="M26 14L34 32H18L26 14Z" fill="#3B82F6"/>
+  <path d="M26 21L30 30H22L26 21Z" fill="#18181B"/>
+  <text x="44" y="28" fill="#FFFFFF" font-family="system-ui, sans-serif" font-size="13" font-weight="800">APEX</text>
+  <text x="82" y="28" fill="#9CA3AF" font-family="system-ui, sans-serif" font-size="11" font-weight="600">TRADER</text>
+</svg>

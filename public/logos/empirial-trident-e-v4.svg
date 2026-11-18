@@ -1,0 +1,7 @@
+<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g class="empirial-trident-logo">
+    <path d="M 78 18 C 82 18 84 22 80 26 C 70 36 52 24 32 24 C 26 24 24 28 24 34 L 24 66 C 24 72 26 76 32 76 C 52 76 70 64 80 74 C 84 78 82 82 78 82" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 24 50 L 74 50 L 86 50" stroke="currentColor" stroke-width="7" stroke-linecap="round"/>
+    <path d="M 74 42 L 86 50 L 74 58" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

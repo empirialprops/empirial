@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="kfBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0b14" />
+      <stop offset="100%" stop-color="#121324" />
+    </linearGradient>
+    <linearGradient id="kfAccent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#E2E8F0" />
+    </linearGradient>
+  </defs>
+  <!-- Background Card -->
+  <rect width="200" height="200" rx="44" fill="url(#kfBg)" />
+  
+  <!-- Stylized Geometric KF Symbol -->
+  <g fill="none" stroke="url(#kfAccent)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Left outer frame / K spine -->
+    <path d="M 62 54 L 88 54 C 98 54 104 60 96 72 L 78 98 L 96 124 C 104 136 98 146 88 146 L 62 146 C 52 146 48 140 48 130 L 48 70 C 48 60 52 54 62 54 Z" fill="none" stroke-width="12" />
+    <!-- Diagonal right wings of K/F -->
+    <path d="M 106 60 L 138 60 C 148 60 152 66 144 76 L 114 116 C 108 124 104 126 98 126" stroke-width="12" />
+    <path d="M 126 100 L 150 134 C 154 140 150 146 140 146 L 118 146" stroke-width="12" />
+  </g>
+</svg>
